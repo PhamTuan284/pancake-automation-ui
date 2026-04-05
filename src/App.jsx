@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-const API = '/api';
+/**
+ * Dev: `.env.development` → `http://localhost:4001` (CORS on API).
+ * Prod: `.env.production` → Railway origin (no trailing `/`).
+ * If unset, falls back to `/api` + path (Vite dev proxy → same port as `PANCAKE_API_PORT` in vite.config).
+ */
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || '')
+  .trim()
+  .replace(/\/+$/, '');
+function apiUrl(path) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  if (!API_ORIGIN) return `/api${p}`;
+  return `${API_ORIGIN}${p}`;
+}
 
 /** Registered tools; add entries here as new UIs ship. */
 const TOOLS = [
@@ -77,7 +89,7 @@ export default function App() {
     setDataLoading(true);
     setDataError('');
     try {
-      const res = await fetch(`${API}/invoice-data`);
+      const res = await fetch(apiUrl('/invoice-data'));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || 'Không tải được dữ liệu');
@@ -105,7 +117,7 @@ export default function App() {
       setCrudSaving(true);
       setCrudError('');
       try {
-        const res = await fetch(`${API}/invoice-data`, {
+        const res = await fetch(apiUrl('/invoice-data'), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows: nextRows }),
@@ -194,7 +206,7 @@ export default function App() {
     setStatus('đang chạy');
     setMessage('');
     try {
-      const res = await fetch(`${API}/run-einvoice-automation`, {
+      const res = await fetch(apiUrl('/run-einvoice-automation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -230,7 +242,7 @@ export default function App() {
     body.append('file', file);
 
     try {
-      const res = await fetch(`${API}/upload-invoice-excel`, {
+      const res = await fetch(apiUrl('/upload-invoice-excel'), {
         method: 'POST',
         body,
       });
