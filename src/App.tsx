@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from 'react';
+import type { ColumnKey, CustomerModalState, InvoiceRow, ToolDef } from './types';
 
 /**
  * Dev: `.env.development` → `http://localhost:4001` (CORS on API).
@@ -8,18 +15,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || '')
   .trim()
   .replace(/\/+$/, '');
-function apiUrl(path) {
+
+function apiUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`;
   if (!API_ORIGIN) return `/api${p}`;
   return `${API_ORIGIN}${p}`;
 }
 
 /** Registered tools; add entries here as new UIs ship. */
-const TOOLS = [
+const TOOLS: ToolDef[] = [
   {
     id: 'pancake-einvoice',
     label: 'Pancake · Hóa đơn điện tử',
-    description: 'Điền dữ liệu khách từ Excel / JSON và chạy automation trên POS.',
+    description:
+      'Điền dữ liệu khách từ Excel / JSON và chạy automation trên POS.',
   },
   {
     id: '_more',
@@ -29,7 +38,7 @@ const TOOLS = [
   },
 ];
 
-const TABLE_COLUMNS = [
+const TABLE_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'buyerName', label: 'Tên khách hàng' },
   { key: 'operationName', label: 'Tên đơn vị' },
   { key: 'taxCode', label: 'Mã số thuế' },
@@ -39,12 +48,12 @@ const TABLE_COLUMNS = [
   { key: 'businessLicense', label: 'Giấy phép kinh doanh' },
 ];
 
-function displayCell(value) {
+function displayCell(value: unknown): string {
   const s = value == null ? '' : String(value).trim();
   return s || '—';
 }
 
-function rowMatchesQuery(row, queryNorm) {
+function rowMatchesQuery(row: InvoiceRow, queryNorm: string): boolean {
   if (!queryNorm) return true;
   const haystack = TABLE_COLUMNS.map((c) =>
     String(row[c.key] ?? '')
@@ -54,22 +63,40 @@ function rowMatchesQuery(row, queryNorm) {
   return haystack.includes(queryNorm);
 }
 
-function emptyCustomerForm() {
-  return Object.fromEntries(TABLE_COLUMNS.map((c) => [c.key, '']));
+function emptyCustomerForm(): InvoiceRow {
+  return Object.fromEntries(TABLE_COLUMNS.map((c) => [c.key, ''])) as InvoiceRow;
+}
+
+function parseInvoiceRows(raw: unknown): InvoiceRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const base = emptyCustomerForm();
+    if (item && typeof item === 'object') {
+      for (const c of TABLE_COLUMNS) {
+        const v = (item as Record<string, unknown>)[c.key];
+        base[c.key] = v == null ? '' : String(v);
+      }
+    }
+    return base;
+  });
 }
 
 export default function App() {
   const [activeToolId, setActiveToolId] = useState('pancake-einvoice');
   const [status, setStatus] = useState('sẵn sàng');
   const [message, setMessage] = useState('');
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
   const [dataSearch, setDataSearch] = useState('');
-  const [customerModal, setCustomerModal] = useState(null);
-  const [formDraft, setFormDraft] = useState(() => emptyCustomerForm());
+  const [customerModal, setCustomerModal] = useState<CustomerModalState | null>(
+    null
+  );
+  const [formDraft, setFormDraft] = useState<InvoiceRow>(() =>
+    emptyCustomerForm()
+  );
   const [crudSaving, setCrudSaving] = useState(false);
   const [crudError, setCrudError] = useState('');
   const [crudMessage, setCrudMessage] = useState('');
@@ -90,17 +117,21 @@ export default function App() {
     setDataError('');
     try {
       const res = await fetch(apiUrl('/invoice-data'));
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        rows?: unknown;
+        error?: string;
+      };
       if (!res.ok) {
         throw new Error(data.error || 'Không tải được dữ liệu');
       }
-      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setRows(parseInvoiceRows(data.rows));
       setDataSearch('');
     } catch (err) {
       console.error(err);
       setDataError(
-        err.message ||
-          'Không kết nối được API. Chạy npm start trong pancake-automation-server.'
+        err instanceof Error
+          ? err.message
+          : 'Không kết nối được API. Chạy npm start trong pancake-automation-server.'
       );
       setRows([]);
     } finally {
@@ -109,11 +140,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadInvoiceData();
+    void loadInvoiceData();
   }, [loadInvoiceData]);
 
   const persistInvoiceRows = useCallback(
-    async (nextRows) => {
+    async (nextRows: InvoiceRow[]) => {
       setCrudSaving(true);
       setCrudError('');
       try {
@@ -122,7 +153,7 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows: nextRows }),
         });
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) {
           throw new Error(data.error || 'Lưu thất bại');
         }
@@ -132,7 +163,9 @@ export default function App() {
         setCustomerModal(null);
       } catch (err) {
         console.error(err);
-        setCrudError(err.message || 'Lỗi lưu dữ liệu');
+        setCrudError(
+          err instanceof Error ? err.message : 'Lỗi lưu dữ liệu'
+        );
       } finally {
         setCrudSaving(false);
       }
@@ -146,7 +179,7 @@ export default function App() {
     setCustomerModal({ mode: 'add' });
   };
 
-  const openEditCustomer = (origIndex) => {
+  const openEditCustomer = (origIndex: number) => {
     setCrudError('');
     const row = rows[origIndex];
     if (!row) return;
@@ -157,7 +190,7 @@ export default function App() {
           c.key,
           row[c.key] == null ? '' : String(row[c.key]),
         ])
-      ),
+      ) as InvoiceRow,
     });
     setCustomerModal({ mode: 'edit', index: origIndex });
   };
@@ -177,7 +210,7 @@ export default function App() {
       setCrudError('Cần ít nhất Tên khách hàng hoặc Tên đơn vị.');
       return;
     }
-    let nextRows;
+    let nextRows: InvoiceRow[];
     if (customerModal.mode === 'add') {
       nextRows = [...rows, { ...formDraft }];
     } else {
@@ -188,14 +221,12 @@ export default function App() {
     await persistInvoiceRows(nextRows);
   };
 
-  const deleteCustomerAt = (origIndex) => {
+  const deleteCustomerAt = (origIndex: number) => {
     const row = rows[origIndex];
     const label =
       String(row?.buyerName || row?.operationName || 'dòng này').trim() ||
       'dòng này';
-    if (
-      !window.confirm(`Xóa khách hàng “${label}” khỏi danh sách?`)
-    ) {
+    if (!window.confirm(`Xóa khách hàng “${label}” khỏi danh sách?`)) {
       return;
     }
     const nextRows = rows.filter((_, i) => i !== origIndex);
@@ -210,7 +241,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.status === 409) {
         setStatus('đang bận');
         setMessage(data.error || 'Automation is already running.');
@@ -225,13 +256,14 @@ export default function App() {
       console.error(err);
       setStatus('lỗi');
       setMessage(
-        err.message ||
-          'Could not reach the server. Start the API: npm start in pancake-automation-server.'
+        err instanceof Error
+          ? err.message
+          : 'Could not reach the server. Start the API: npm start in pancake-automation-server.'
       );
     }
   };
 
-  const onUpload = async (e) => {
+  const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -246,21 +278,28 @@ export default function App() {
         method: 'POST',
         body,
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        count?: number;
+      };
       if (!res.ok) {
         throw new Error(data.error || 'Tải file thất bại');
       }
       setUploadStatus('Đã nhập');
-      setUploadMessage(`Đã nhập ${data.count} dòng vào invoiceData.json.`);
+      setUploadMessage(
+        `Đã nhập ${data.count ?? 0} dòng vào invoiceData.json.`
+      );
       await loadInvoiceData();
     } catch (err) {
       console.error(err);
       setUploadStatus('Lỗi');
-      setUploadMessage(err.message || 'Lỗi upload');
+      setUploadMessage(
+        err instanceof Error ? err.message : 'Lỗi upload'
+      );
     }
   };
 
-  const activeTool = TOOLS.find((t) => t.id === activeToolId) || TOOLS[0];
+  const activeTool = TOOLS.find((t) => t.id === activeToolId) ?? TOOLS[0];
 
   return (
     <div className="page">
@@ -336,7 +375,7 @@ export default function App() {
               <button
                 type="button"
                 className="btn"
-                onClick={runAutomation}
+                onClick={() => void runAutomation()}
                 disabled={status === 'đang chạy'}
               >
                 {status === 'đang chạy' ? 'Đang chạy…' : 'Chạy tự động'}
@@ -365,7 +404,7 @@ export default function App() {
                 <input
                   type="file"
                   accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  onChange={onUpload}
+                  onChange={(e) => void onUpload(e)}
                   disabled={uploadStatus === 'Đang xử lý'}
                 />
                 <span className="file-btn">
