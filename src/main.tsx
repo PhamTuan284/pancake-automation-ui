@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
+import './index.scss';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

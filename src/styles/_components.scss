@@ -1,0 +1,94 @@
+@use './tokens' as t;
+@use './mixins' as m;
+
+%btn-shared {
+  @include m.control-base;
+  padding: 0 18px;
+  cursor: pointer;
+  @include m.smooth-border-bg;
+}
+
+.btn,
+.btn-secondary,
+.btn-tiny {
+  @extend %btn-shared;
+}
+
+.btn {
+  width: 100%;
+  border: 1px solid t.$primary;
+  background: t.$primary;
+  color: #f8fafc;
+
+  &:hover:not(:disabled) {
+    background: t.$primary-hover;
+    border-color: t.$primary-hover;
+  }
+}
+
+.btn-secondary {
+  border: 1px solid t.$border-strong;
+  background: t.$bg-hover;
+  color: t.$text-primary;
+
+  &:hover:not(:disabled) {
+    border-color: #64748b;
+    background: #334155;
+  }
+}
+
+.btn-tiny {
+  @include m.control-base(40px, 10px);
+  padding: 0 12px;
+  font-size: 12px;
+  border: 1px solid t.$border-strong;
+  background: #1e3a5f;
+  color: t.$text-primary;
+
+  &:hover:not(:disabled) {
+    border-color: t.$primary;
+    background: #1b4f8e;
+  }
+}
+
+.btn-tiny-danger {
+  border-color: #7f1d1d;
+  background: #3f1d1d;
+  color: #fecaca;
+
+  &:hover:not(:disabled) {
+    border-color: t.$error;
+    background: #7f1d1d;
+    color: #fff;
+  }
+}
+
+.search-input,
+.modal-input {
+  border: 1px solid t.$border-default;
+  background: t.$bg-page;
+  color: t.$text-primary;
+  outline: none;
+  transition: border-color t.$trans-fast, box-shadow t.$trans-fast;
+}
+
+.search-input {
+  width: 100%;
+  height: t.$control-h;
+  padding: 0 40px 0 12px;
+  border-radius: t.$radius-sm;
+  font-size: 14px;
+
+  &::placeholder {
+    color: t.$text-muted;
+  }
+}
+
+.modal-input {
+  width: 100%;
+  min-height: t.$control-h;
+  padding: 10px 12px;
+  border-radius: t.$radius-sm;
+  font-size: 14px;
+}
+

@@ -1,0 +1,30 @@
+@use './tokens' as t;
+
+@mixin control-base($height: t.$control-h, $radius: t.$radius-sm) {
+  min-height: $height;
+  border-radius: $radius;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+@mixin focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 3px t.$ring;
+}
+
+@mixin smooth-border-bg {
+  transition:
+    background t.$trans-fast,
+    border-color t.$trans-fast,
+    color t.$trans-fast,
+    box-shadow t.$trans-fast,
+    opacity t.$trans-fast;
+}
+
+%interactive-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
