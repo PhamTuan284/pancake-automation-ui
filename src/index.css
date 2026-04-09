@@ -273,6 +273,50 @@ body {
   margin-bottom: 16px;
 }
 
+.excel-upload-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+/* Equal width + matching height/typography for template + upload. */
+.excel-upload-toolbar .excel-template-link,
+.excel-upload-toolbar .excel-file-label {
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-width: 0;
+}
+
+a.excel-template-link {
+  text-decoration: none;
+}
+
+.excel-upload-toolbar .excel-template-link,
+.excel-upload-toolbar .excel-file-label .file-btn {
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.excel-upload-toolbar .excel-file-label {
+  display: flex;
+  cursor: pointer;
+}
+
+.excel-upload-toolbar .excel-file-label .file-btn {
+  width: 100%;
+}
+
 .file-label {
   display: inline-block;
   cursor: pointer;

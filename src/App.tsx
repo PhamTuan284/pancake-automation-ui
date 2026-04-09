@@ -158,7 +158,7 @@ export default function App() {
           throw new Error(data.error || 'Lưu thất bại');
         }
         await loadInvoiceData();
-        setCrudMessage('Đã cập nhật invoiceData.json.');
+        setCrudMessage('Đã cập nhật dữ liệu khách hàng.');
         setTimeout(() => setCrudMessage(''), 3200);
         setCustomerModal(null);
       } catch (err) {
@@ -287,7 +287,7 @@ export default function App() {
       }
       setUploadStatus('Đã nhập');
       setUploadMessage(
-        `Đã nhập ${data.count ?? 0} dòng vào invoiceData.json.`
+        `Đã nhập ${data.count ?? 0} dòng vào kho dữ liệu.`
       );
       await loadInvoiceData();
     } catch (err) {
@@ -369,8 +369,8 @@ export default function App() {
               </h2>
               <p className="muted small">
                 Mở trình duyệt điều khiển, đăng nhập POS và lần lượt xử lý các
-                hóa đơn <strong>Chưa phát hành</strong> khớp dữ liệu trong{' '}
-                <code>invoiceData.json</code>.
+                hóa đơn <strong>Chưa phát hành</strong> khớp dữ liệu khách hàng
+                (API / DB).
               </p>
               <button
                 type="button"
@@ -397,22 +397,30 @@ export default function App() {
                   Giấy phép kinh doanh, Tên đơn vị
                 </strong>
                 . Sheet đầu tiên được dùng. Mỗi lần tải sẽ{' '}
-                <strong>thay thế</strong> toàn bộ nội dung{' '}
-                <code>invoiceData.json</code>.
+                <strong>thay thế</strong> toàn bộ dữ liệu khách hàng trên server.
               </p>
-              <label className="file-label">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  onChange={(e) => void onUpload(e)}
-                  disabled={uploadStatus === 'Đang xử lý'}
-                />
-                <span className="file-btn">
-                  {uploadStatus === 'Đang xử lý'
-                    ? 'Đang xử lý…'
-                    : 'Chọn file .xlsx / .xls'}
-                </span>
-              </label>
+              <div className="excel-upload-toolbar">
+                <a
+                  className="btn-secondary excel-template-link"
+                  href={apiUrl('/invoice-excel-template')}
+                  download="mau-khach-hang-hoa-don-dien-tu.xlsx"
+                >
+                  Tải file mẫu Excel
+                </a>
+                <label className="file-label excel-file-label">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                    onChange={(e) => void onUpload(e)}
+                    disabled={uploadStatus === 'Đang xử lý'}
+                  />
+                  <span className="file-btn">
+                    {uploadStatus === 'Đang xử lý'
+                      ? 'Đang xử lý…'
+                      : 'Chọn file .xlsx / .xls'}
+                  </span>
+                </label>
+              </div>
               {uploadMessage && (
                 <p
                   className={
