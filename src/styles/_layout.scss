@@ -572,6 +572,26 @@ a.excel-template-link,
   margin: 0;
 }
 
+// Pancake Open API lists: default .data-table uses width:100% + max-width on td +
+// word-break:break-word, so many columns become ultra-narrow and UUIDs wrap per character.
+.webhook-openapi-wrap .data-table--openapi {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.webhook-openapi-wrap .data-table--openapi th,
+.webhook-openapi-wrap .data-table--openapi td {
+  max-width: none;
+  word-break: normal;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.webhook-openapi-wrap .data-table--openapi th {
+  padding-right: 16px;
+}
+
 .oss-picks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

@@ -31,7 +31,7 @@ function apiUrl(path: string): string {
   return `${API_ORIGIN}${p}`;
 }
 
-function extractWarehouseRows(root: unknown): Record<string, unknown>[] {
+function extractApiRows(root: unknown): Record<string, unknown>[] {
   const asRowObjects = (arr: unknown): Record<string, unknown>[] => {
     if (!Array.isArray(arr)) return [];
     return arr.filter(
@@ -46,13 +46,33 @@ function extractWarehouseRows(root: unknown): Record<string, unknown>[] {
   if (!root || typeof root !== 'object' || Array.isArray(root)) return [];
 
   const o = root as Record<string, unknown>;
-  for (const key of ['data', 'warehouses', 'results', 'items'] as const) {
+  for (const key of [
+    'data',
+    'results',
+    'items',
+    'warehouses',
+    'customers',
+    'variations',
+    'products',
+    'einvoices',
+    'invoices',
+    'list',
+  ] as const) {
     const inner = asRowObjects(o[key]);
     if (inner.length > 0) return inner;
     const nested = o[key];
     if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
       const n = nested as Record<string, unknown>;
-      for (const k2 of ['data', 'warehouses', 'results'] as const) {
+      for (const k2 of [
+        'data',
+        'results',
+        'items',
+        'warehouses',
+        'customers',
+        'variations',
+        'products',
+        'einvoices',
+      ] as const) {
         const inner2 = asRowObjects(n[k2]);
         if (inner2.length > 0) return inner2;
       }
@@ -61,27 +81,36 @@ function extractWarehouseRows(root: unknown): Record<string, unknown>[] {
   return [];
 }
 
-function warehouseTableColumns(rows: Record<string, unknown>[]): string[] {
-  if (rows.length === 0) return [];
-  const keys = new Set<string>();
-  for (const r of rows.slice(0, 30)) {
-    Object.keys(r).forEach((k) => keys.add(k));
+function isApiCellEmpty(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  if (typeof v === 'object') {
+    const s = JSON.stringify(v);
+    return s === '{}' || s === '[]';
   }
-  const preferred = [
-    'id',
-    'warehouse_id',
-    'name',
-    'title',
-    'address',
-    'phone',
-    'is_default',
-    'status',
-  ];
-  const rest = [...keys].filter((k) => !preferred.includes(k)).sort();
-  return [...preferred.filter((k) => keys.has(k)), ...rest].slice(0, 14);
+  return false;
 }
 
-function warehouseCellText(v: unknown): string {
+function apiTableColumns(
+  rows: Record<string, unknown>[],
+  preferred: string[]
+): string[] {
+  if (rows.length === 0) return [];
+  const keys = new Set<string>();
+  for (const r of rows.slice(0, 50)) {
+    Object.keys(r).forEach((k) => keys.add(k));
+  }
+  const nonEmpty = [...keys].filter((k) =>
+    rows.some((r) => !isApiCellEmpty(r[k]))
+  );
+  const rest = nonEmpty.filter((k) => !preferred.includes(k)).sort();
+  return [...preferred.filter((k) => nonEmpty.includes(k)), ...rest].slice(
+    0,
+    24
+  );
+}
+
+function apiCellText(v: unknown): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
@@ -367,14 +396,96 @@ export default function App() {
   const [whWarehousesLoading, setWhWarehousesLoading] = useState(false);
   const [whWarehousesError, setWhWarehousesError] = useState('');
   const [whWarehousesData, setWhWarehousesData] = useState<unknown>(null);
+  const [whEinvoicesLoading, setWhEinvoicesLoading] = useState(false);
+  const [whEinvoicesError, setWhEinvoicesError] = useState('');
+  const [whEinvoicesData, setWhEinvoicesData] = useState<unknown>(null);
+  const [whProductsLoading, setWhProductsLoading] = useState(false);
+  const [whProductsError, setWhProductsError] = useState('');
+  const [whProductsData, setWhProductsData] = useState<unknown>(null);
+  const [whCustomersLoading, setWhCustomersLoading] = useState(false);
+  const [whCustomersError, setWhCustomersError] = useState('');
+  const [whCustomersData, setWhCustomersData] = useState<unknown>(null);
 
   const whWarehouseRows = useMemo(
-    () => extractWarehouseRows(whWarehousesData),
+    () => extractApiRows(whWarehousesData),
     [whWarehousesData]
   );
   const whWarehouseCols = useMemo(
-    () => warehouseTableColumns(whWarehouseRows),
+    () =>
+      apiTableColumns(whWarehouseRows, [
+        'id',
+        'warehouse_id',
+        'name',
+        'title',
+        'address',
+        'phone',
+        'is_default',
+        'status',
+        'allow_create_order',
+      ]),
     [whWarehouseRows]
+  );
+  const whEinvoiceRows = useMemo(
+    () => extractApiRows(whEinvoicesData),
+    [whEinvoicesData]
+  );
+  const whEinvoiceCols = useMemo(
+    () =>
+      apiTableColumns(whEinvoiceRows, [
+        'id',
+        'code',
+        'invoice_number',
+        'status',
+        'created_at',
+        'updated_at',
+        'total',
+        'amount',
+        'customer_name',
+        'customer_phone',
+      ]),
+    [whEinvoiceRows]
+  );
+  const whProductRows = useMemo(
+    () => extractApiRows(whProductsData),
+    [whProductsData]
+  );
+  const whProductCols = useMemo(
+    () =>
+      apiTableColumns(whProductRows, [
+        'variation_id',
+        'id',
+        'sku',
+        'product_sku',
+        'name',
+        'product_name',
+        'barcode',
+        'price',
+        'quantity',
+        'status',
+        'updated_at',
+      ]),
+    [whProductRows]
+  );
+  const whCustomerRows = useMemo(
+    () => extractApiRows(whCustomersData),
+    [whCustomersData]
+  );
+  const whCustomerCols = useMemo(
+    () =>
+      apiTableColumns(whCustomerRows, [
+        'id',
+        'customer_id',
+        'name',
+        'full_name',
+        'phone',
+        'email',
+        'address',
+        'level_id',
+        'point',
+        'inserted_at',
+        'updated_at',
+      ]),
+    [whCustomerRows]
   );
 
   const searchNorm = useMemo(
@@ -667,6 +778,83 @@ export default function App() {
       );
     } finally {
       setWhWarehousesLoading(false);
+    }
+  };
+
+  const loadPancakeEinvoices = async () => {
+    setWhEinvoicesLoading(true);
+    setWhEinvoicesError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/einvoices'));
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        data?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải được danh sách hóa đơn điện tử');
+      }
+      setWhEinvoicesData(data.data ?? null);
+    } catch (err) {
+      console.error(err);
+      setWhEinvoicesData(null);
+      setWhEinvoicesError(
+        err instanceof Error
+          ? err.message
+          : 'Không tải được danh sách hóa đơn điện tử.'
+      );
+    } finally {
+      setWhEinvoicesLoading(false);
+    }
+  };
+
+  const loadPancakeProductsVariations = async () => {
+    setWhProductsLoading(true);
+    setWhProductsError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/products/variations'));
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        data?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải được danh sách sản phẩm');
+      }
+      setWhProductsData(data.data ?? null);
+    } catch (err) {
+      console.error(err);
+      setWhProductsData(null);
+      setWhProductsError(
+        err instanceof Error ? err.message : 'Không tải được danh sách sản phẩm.'
+      );
+    } finally {
+      setWhProductsLoading(false);
+    }
+  };
+
+  const loadPancakeCustomers = async () => {
+    setWhCustomersLoading(true);
+    setWhCustomersError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/customers'));
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        data?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải được danh sách khách hàng');
+      }
+      setWhCustomersData(data.data ?? null);
+    } catch (err) {
+      console.error(err);
+      setWhCustomersData(null);
+      setWhCustomersError(
+        err instanceof Error ? err.message : 'Không tải được danh sách khách hàng.'
+      );
+    } finally {
+      setWhCustomersLoading(false);
     }
   };
 
@@ -1206,14 +1394,6 @@ export default function App() {
                   Danh sách kho hàng
                 </h2>
                 <div className="table-head-actions">
-                  <a
-                    className="btn-secondary"
-                    href="https://api-docs.pancake.vn/#tag/kho-h%C3%A0ng/GET/shops/{SHOP_ID}/warehouses"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Tài liệu API
-                  </a>
                   <button
                     type="button"
                     className="btn"
@@ -1242,8 +1422,8 @@ export default function App() {
               {whWarehousesData !== null &&
                 !whWarehousesError &&
                 whWarehouseRows.length > 0 && (
-                  <div className="table-wrap">
-                    <table className="data-table">
+                  <div className="table-wrap webhook-openapi-wrap">
+                    <table className="data-table data-table--openapi">
                       <thead>
                         <tr>
                           {whWarehouseCols.map((col) => (
@@ -1262,7 +1442,7 @@ export default function App() {
                           >
                             {whWarehouseCols.map((col) => (
                               <td key={col}>
-                                {warehouseCellText(row[col])}
+                                {apiCellText(row[col])}
                               </td>
                             ))}
                           </tr>
@@ -1276,6 +1456,181 @@ export default function App() {
                 whWarehouseRows.length === 0 && (
                   <pre className="webhook-payload">
                     {JSON.stringify(whWarehousesData, null, 2)}
+                  </pre>
+                )}
+            </section>
+
+            <section className="card" aria-labelledby="wh-einvoices-title">
+              <div className="table-head">
+                <h2 id="wh-einvoices-title" className="section-title">
+                  Danh sách hóa đơn điện tử
+                </h2>
+                <div className="table-head-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void loadPancakeEinvoices()}
+                    disabled={whEinvoicesLoading || !whConfig?.hasApiKey}
+                  >
+                    {whEinvoicesLoading ? 'Đang tải…' : 'Tải từ Pancake'}
+                  </button>
+                </div>
+              </div>
+              {!whConfig?.hasApiKey && (
+                <p className="muted small">
+                  Thêm <code>PANCAKE_API_KEY</code> trên server để bật nút tải.
+                </p>
+              )}
+              {whEinvoicesError && (
+                <p className="hint hint-error">{whEinvoicesError}</p>
+              )}
+              {whEinvoicesData !== null &&
+                !whEinvoicesError &&
+                whEinvoiceRows.length > 0 && (
+                  <div className="table-wrap webhook-openapi-wrap">
+                    <table className="data-table data-table--openapi">
+                      <thead>
+                        <tr>
+                          {whEinvoiceCols.map((col) => (
+                            <th key={col}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {whEinvoiceRows.map((row, i) => (
+                          <tr key={String(row.id ?? `ein-${i}`)}>
+                            {whEinvoiceCols.map((col) => (
+                              <td key={col}>{apiCellText(row[col])}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              {whEinvoicesData !== null &&
+                !whEinvoicesError &&
+                whEinvoiceRows.length === 0 && (
+                  <pre className="webhook-payload">
+                    {JSON.stringify(whEinvoicesData, null, 2)}
+                  </pre>
+                )}
+            </section>
+
+            <section className="card" aria-labelledby="wh-products-title">
+              <div className="table-head">
+                <h2 id="wh-products-title" className="section-title">
+                  Danh sách sản phẩm
+                </h2>
+                <div className="table-head-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void loadPancakeProductsVariations()}
+                    disabled={whProductsLoading || !whConfig?.hasApiKey}
+                  >
+                    {whProductsLoading ? 'Đang tải…' : 'Tải từ Pancake'}
+                  </button>
+                </div>
+              </div>
+              {!whConfig?.hasApiKey && (
+                <p className="muted small">
+                  Thêm <code>PANCAKE_API_KEY</code> trên server để bật nút tải.
+                </p>
+              )}
+              {whProductsError && (
+                <p className="hint hint-error">{whProductsError}</p>
+              )}
+              {whProductsData !== null &&
+                !whProductsError &&
+                whProductRows.length > 0 && (
+                  <div className="table-wrap webhook-openapi-wrap">
+                    <table className="data-table data-table--openapi">
+                      <thead>
+                        <tr>
+                          {whProductCols.map((col) => (
+                            <th key={col}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {whProductRows.map((row, i) => (
+                          <tr
+                            key={String(
+                              row.variation_id ?? row.id ?? row.sku ?? `prd-${i}`
+                            )}
+                          >
+                            {whProductCols.map((col) => (
+                              <td key={col}>{apiCellText(row[col])}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              {whProductsData !== null &&
+                !whProductsError &&
+                whProductRows.length === 0 && (
+                  <pre className="webhook-payload">
+                    {JSON.stringify(whProductsData, null, 2)}
+                  </pre>
+                )}
+            </section>
+
+            <section className="card" aria-labelledby="wh-customers-title">
+              <div className="table-head">
+                <h2 id="wh-customers-title" className="section-title">
+                  Danh sách khách hàng
+                </h2>
+                <div className="table-head-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void loadPancakeCustomers()}
+                    disabled={whCustomersLoading || !whConfig?.hasApiKey}
+                  >
+                    {whCustomersLoading ? 'Đang tải…' : 'Tải từ Pancake'}
+                  </button>
+                </div>
+              </div>
+              {!whConfig?.hasApiKey && (
+                <p className="muted small">
+                  Thêm <code>PANCAKE_API_KEY</code> trên server để bật nút tải.
+                </p>
+              )}
+              {whCustomersError && (
+                <p className="hint hint-error">{whCustomersError}</p>
+              )}
+              {whCustomersData !== null &&
+                !whCustomersError &&
+                whCustomerRows.length > 0 && (
+                  <div className="table-wrap webhook-openapi-wrap">
+                    <table className="data-table data-table--openapi">
+                      <thead>
+                        <tr>
+                          {whCustomerCols.map((col) => (
+                            <th key={col}>{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {whCustomerRows.map((row, i) => (
+                          <tr key={String(row.id ?? row.customer_id ?? `cus-${i}`)}>
+                            {whCustomerCols.map((col) => (
+                              <td key={col}>{apiCellText(row[col])}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              {whCustomersData !== null &&
+                !whCustomersError &&
+                whCustomerRows.length === 0 && (
+                  <pre className="webhook-payload">
+                    {JSON.stringify(whCustomersData, null, 2)}
                   </pre>
                 )}
             </section>
