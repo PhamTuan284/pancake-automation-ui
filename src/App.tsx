@@ -5,7 +5,16 @@ import {
   useState,
   type ChangeEvent,
 } from 'react';
-import type { ColumnKey, CustomerModalState, InvoiceRow, ToolDef } from './types';
+import type {
+  ColumnKey,
+  CustomerModalState,
+  IntegrationServiceInfo,
+  IntegrationsBundle,
+  InvoiceRow,
+  PancakeWebhookConfig,
+  PancakeWebhookEventRow,
+  ToolDef,
+} from './types';
 
 /**
  * Dev: `.env.development` → `http://localhost:4001` (CORS on API).
@@ -31,12 +40,198 @@ const TOOLS: ToolDef[] = [
       'Điền dữ liệu khách từ Excel / JSON và chạy automation trên POS.',
   },
   {
-    id: '_more',
-    label: 'Công cụ khác',
-    disabled: true,
-    description: 'Sẽ xuất hiện khi có thêm module.',
+    id: 'pancake-webhook',
+    label: 'Pancake · Webhook',
+    description:
+      'Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API.',
+  },
+  {
+    id: 'opensource-hrm',
+    label: 'HRM · Horilla',
+    description:
+      'Nhân sự mã nguồn mở (Horilla) — chạy bằng Docker trong monorepo MeiT Tools.',
+  },
+  {
+    id: 'opensource-crm',
+    label: 'CRM · EspoCRM',
+    description:
+      'CRM mã nguồn mở (EspoCRM) — chạy bằng Docker trong monorepo MeiT Tools.',
   },
 ];
+
+function IntegrationServiceCard({
+  info,
+  focused,
+}: {
+  info: IntegrationServiceInfo;
+  focused: boolean;
+}) {
+  const pillClass = info.reachable
+    ? 'integration-status-pill integration-status-pill--ok'
+    : 'integration-status-pill integration-status-pill--bad';
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(info.url);
+    } catch {
+      window.prompt('Sao chép URL:', info.url);
+    }
+  };
+
+  return (
+    <article
+      className={
+        focused
+          ? 'integration-card integration-card--focus'
+          : 'integration-card'
+      }
+    >
+      <div className={pillClass}>
+        {info.reachable ? 'Đang phản hồi' : 'Chưa kết nối được'}
+      </div>
+      <h3 className="integration-card-title">{info.product}</h3>
+      <p className="integration-card-meta">Docker: {info.dockerImage}</p>
+      <p className="integration-card-url">
+        <code>{info.url}</code>
+      </p>
+      {info.error ? (
+        <p className="hint hint-error integration-card-hint">
+          {info.error}
+          {info.httpStatus != null ? ` · HTTP ${info.httpStatus}` : ''}
+        </p>
+      ) : null}
+      <div className="integration-actions">
+        <a href={info.url} target="_blank" rel="noreferrer">
+          Mở {info.product}
+        </a>
+        <button type="button" className="btn-secondary" onClick={() => void copyUrl()}>
+          Sao chép URL
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function MeitIntegrationsPanel({ focus }: { focus: 'hrm' | 'crm' }) {
+  const [bundle, setBundle] = useState<IntegrationsBundle | null>(null);
+  const [loadErr, setLoadErr] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr('');
+    try {
+      const res = await fetch(apiUrl('/integrations'));
+      const data = (await res.json().catch(() => ({}))) as Partial<
+        IntegrationsBundle & { error?: string }
+      >;
+      if (!res.ok) {
+        throw new Error(data.error || 'API lỗi');
+      }
+      setBundle(data as IntegrationsBundle);
+    } catch (e) {
+      setBundle(null);
+      setLoadErr(
+        e instanceof Error ? e.message : 'Không tải được /integrations'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const id = setInterval(() => void load(), 25000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  return (
+    <>
+      <section className="card" aria-labelledby="meit-int-run-title">
+        <h2 id="meit-int-run-title" className="section-title">
+          Chạy stack trong repo MeiT Tools
+        </h2>
+        <p className="muted small">
+          <strong>Horilla</strong> (HRM) và <strong>EspoCRM</strong> (CRM) được
+          đóng gói trong{' '}
+          <code>{bundle?.composeFile ?? 'docker-compose.integrations.yml'}</code>
+          . Từ thư mục gốc monorepo:
+        </p>
+        <pre className="webhook-payload integration-cli-snippet">
+          npm run integrations:up
+        </pre>
+        <p className="muted small integration-run-note">
+          Tuỳ chọn: sao chép{' '}
+          <code>{bundle?.envFileExample ?? 'compose.integrations.env.example'}</code>{' '}
+          → <code>compose.integrations.env</code> (đã liệt kê trong{' '}
+          <code>.gitignore</code>), chỉnh mật khẩu, rồi chạy{' '}
+          <code>
+            docker compose -f docker-compose.integrations.yml --env-file
+            compose.integrations.env up -d
+          </code>
+          . Cổng mặc định: HRM <code>18080</code>, CRM <code>18081</code>. Tài
+          liệu EspoCRM Docker:{' '}
+          <a
+            href="https://docs.espocrm.com/administration/docker/installation"
+            target="_blank"
+            rel="noreferrer"
+          >
+            docs.espocrm.com
+          </a>
+          ; Horilla image:{' '}
+          <a
+            href="https://hub.docker.com/r/horilla/horilla"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Docker Hub
+          </a>
+          .
+        </p>
+      </section>
+
+      <section className="card" aria-labelledby="meit-int-status-title">
+        <div className="table-head">
+          <h2 id="meit-int-status-title" className="section-title">
+            Trạng thái dịch vụ
+          </h2>
+          <div className="table-head-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {loading ? 'Đang kiểm tra…' : 'Kiểm tra lại'}
+            </button>
+          </div>
+        </div>
+        {loadErr && <p className="hint hint-error">{loadErr}</p>}
+        {loading && !bundle && !loadErr && (
+          <p className="muted">Đang gọi API…</p>
+        )}
+        {bundle && (
+          <div className="integration-grid">
+            <IntegrationServiceCard
+              info={bundle.hrm}
+              focused={focus === 'hrm'}
+            />
+            <IntegrationServiceCard
+              info={bundle.crm}
+              focused={focus === 'crm'}
+            />
+          </div>
+        )}
+        <p className="muted small integration-run-note">
+          Probe chạy trên server Node (GET <code>/integrations</code>). Nếu triển
+          khai public, đặt <code>MEIT_HRM_PUBLIC_URL</code> và{' '}
+          <code>MEIT_CRM_PUBLIC_URL</code> trong{' '}
+          <code>pancake-automation-server/.env</code>.
+        </p>
+      </section>
+    </>
+  );
+}
 
 const TABLE_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'buyerName', label: 'Tên khách hàng' },
@@ -101,6 +296,19 @@ export default function App() {
   const [crudError, setCrudError] = useState('');
   const [crudMessage, setCrudMessage] = useState('');
 
+  const [whConfig, setWhConfig] = useState<PancakeWebhookConfig | null>(null);
+  const [whConfigError, setWhConfigError] = useState('');
+  const [whEvents, setWhEvents] = useState<PancakeWebhookEventRow[]>([]);
+  const [whEventsSource, setWhEventsSource] = useState('');
+  const [whPanelLoading, setWhPanelLoading] = useState(false);
+  const [whEventsLoading, setWhEventsLoading] = useState(false);
+  const [whMessage, setWhMessage] = useState('');
+  const [whError, setWhError] = useState('');
+  const [whRegisterUrl, setWhRegisterUrl] = useState('');
+  const [whRegisterEmail, setWhRegisterEmail] = useState('');
+  const [whTypes, setWhTypes] = useState<string[]>(['orders', 'customers']);
+  const [whRegisterBusy, setWhRegisterBusy] = useState(false);
+
   const searchNorm = useMemo(
     () => dataSearch.trim().toLocaleLowerCase('vi-VN'),
     [dataSearch]
@@ -142,6 +350,68 @@ export default function App() {
   useEffect(() => {
     void loadInvoiceData();
   }, [loadInvoiceData]);
+
+  const loadWebhookPanel = useCallback(async () => {
+    setWhPanelLoading(true);
+    setWhConfigError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/config'));
+      const data = (await res.json().catch(() => ({}))) as Partial<
+        PancakeWebhookConfig & { error?: string }
+      >;
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải cấu hình webhook');
+      }
+      setWhConfig(data as PancakeWebhookConfig);
+    } catch (err) {
+      console.error(err);
+      setWhConfig(null);
+      setWhConfigError(
+        err instanceof Error
+          ? err.message
+          : 'Không kết nối được API webhook.'
+      );
+    } finally {
+      setWhPanelLoading(false);
+    }
+  }, []);
+
+  const loadWebhookEvents = useCallback(async () => {
+    setWhEventsLoading(true);
+    setWhError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/events?limit=50'));
+      const data = (await res.json().catch(() => ({}))) as {
+        events?: PancakeWebhookEventRow[];
+        source?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải sự kiện');
+      }
+      setWhEvents(Array.isArray(data.events) ? data.events : []);
+      setWhEventsSource(data.source || '');
+    } catch (err) {
+      console.error(err);
+      setWhEvents([]);
+      setWhError(
+        err instanceof Error ? err.message : 'Không tải được sự kiện webhook.'
+      );
+    } finally {
+      setWhEventsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeToolId !== 'pancake-webhook') return;
+    void loadWebhookPanel();
+    void loadWebhookEvents();
+  }, [activeToolId, loadWebhookPanel, loadWebhookEvents]);
+
+  useEffect(() => {
+    if (!whConfig?.fullReceiverUrl || whRegisterUrl.trim()) return;
+    setWhRegisterUrl(whConfig.fullReceiverUrl);
+  }, [whConfig?.fullReceiverUrl, whRegisterUrl]);
 
   const persistInvoiceRows = useCallback(
     async (nextRows: InvoiceRow[]) => {
@@ -301,15 +571,88 @@ export default function App() {
 
   const activeTool = TOOLS.find((t) => t.id === activeToolId) ?? TOOLS[0];
 
+  const toggleWhType = (t: string) => {
+    setWhTypes((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
+  };
+
+  const registerPancakeWebhook = async () => {
+    const url = whRegisterUrl.trim();
+    if (!url) {
+      setWhError('Cần URL webhook (HTTPS, trỏ tới POST /webhooks/pancake trên server này).');
+      return;
+    }
+    if (!whTypes.length) {
+      setWhError('Chọn ít nhất một loại dữ liệu (orders, customers, …).');
+      return;
+    }
+    setWhRegisterBusy(true);
+    setWhError('');
+    setWhMessage('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/register'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhook_url: url,
+          webhook_enable: true,
+          webhook_types: whTypes,
+          webhook_email: whRegisterEmail.trim() || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        ok?: boolean;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Đăng ký webhook thất bại');
+      }
+      setWhMessage(
+        'Đã gửi cấu hình lên Pancake (PUT /shops/{shop}). Kiểm tra POS → Cấu hình → Webhook/API.'
+      );
+      setTimeout(() => setWhMessage(''), 6000);
+    } catch (err) {
+      console.error(err);
+      setWhError(
+        err instanceof Error ? err.message : 'Đăng ký webhook thất bại.'
+      );
+    } finally {
+      setWhRegisterBusy(false);
+    }
+  };
+
+  const clearWebhookEvents = async () => {
+    if (
+      !window.confirm('Xóa toàn bộ sự kiện webhook đã lưu trên server?')
+    ) {
+      return;
+    }
+    setWhError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/events'), {
+        method: 'DELETE',
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không xóa được');
+      }
+      await loadWebhookEvents();
+      setWhMessage('Đã xóa danh sách sự kiện.');
+      setTimeout(() => setWhMessage(''), 3200);
+    } catch (err) {
+      console.error(err);
+      setWhError(
+        err instanceof Error ? err.message : 'Không xóa được sự kiện.'
+      );
+    }
+  };
+
   return (
     <div className="page">
       <header className="app-brand" role="banner">
         <div className="app-brand-inner">
           <h1 className="app-brand-title">MeiT Tools</h1>
-          <p className="app-brand-tagline">
-            Bộ công cụ nội bộ — chọn tiện ích bên dưới. Các module mới sẽ được
-            thêm dần.
-          </p>
         </div>
       </header>
 
@@ -637,6 +980,206 @@ export default function App() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {activeToolId === 'pancake-webhook' && (
+          <>
+            <p className="tool-intro muted">
+              {activeTool.description}{' '}
+              <a
+                href="https://api-docs.pancake.vn/#tag/webhook/put/shopsshop_id"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Tài liệu Webhook (PUT /shops/&#123;SHOP_ID&#125;)
+              </a>
+              . Pancake sẽ <strong>POST JSON</strong> tới URL bạn đăng ký; server
+              lưu và hiển thị các bản ghi gần đây (MongoDB nếu có{' '}
+              <code>MONGODB_URI</code>, không thì bộ nhớ tạm).
+            </p>
+
+            <section className="card" aria-labelledby="wh-receiver-title">
+              <h2 id="wh-receiver-title" className="section-title">
+                URL nhận webhook
+              </h2>
+              {whPanelLoading && (
+                <p className="muted">Đang tải cấu hình…</p>
+              )}
+              {whConfigError && (
+                <p className="hint hint-error">{whConfigError}</p>
+              )}
+              {!whPanelLoading && whConfig && (
+                <>
+                  <p className="muted small">
+                    Shop ID (server): <code>{whConfig.shopId}</code>
+                    {whConfig.hasApiKey
+                      ? ' · API key: đã cấu hình'
+                      : ' · API key: chưa có — cần PANCAKE_API_KEY để đăng ký từ UI'}
+                    {whConfig.incomingSecretConfigured
+                      ? ` · Bảo vệ POST: header ${whConfig.incomingSecretHeader}`
+                      : ''}
+                  </p>
+                  {whConfig.fullReceiverUrl ? (
+                    <p className="muted small">
+                      Dán URL này vào Pancake (hoặc dùng form bên dưới):{' '}
+                      <code>{whConfig.fullReceiverUrl}</code>
+                    </p>
+                  ) : (
+                    <p className="hint">
+                      Đặt <code>PANCAKE_PUBLIC_WEBHOOK_BASE</code> trên server
+                      (origin công khai, ví dụ Railway) để hiển thị đủ URL nhận{' '}
+                      <code>{whConfig.receiverPath}</code>.
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="card" aria-labelledby="wh-register-title">
+              <h2 id="wh-register-title" className="section-title">
+                Đăng ký webhook qua Open API
+              </h2>
+              <p className="muted small">
+                Gọi <code>PUT …/api/v1/shops/&#123;shop&#125;?api_key=…</code> như
+                tài liệu Pancake. Cần{' '}
+                <code>PANCAKE_API_KEY</code> và{' '}
+                <code>PANCAKE_SHOP_ID</code> trong .env của server.
+              </p>
+              <div className="webhook-register-field">
+                <span>Webhook URL (HTTPS)</span>
+                <input
+                  type="url"
+                  className="search-input webhook-url-input"
+                  placeholder="https://api.example.com/webhooks/pancake"
+                  value={whRegisterUrl}
+                  onChange={(e) => setWhRegisterUrl(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="webhook-register-field">
+                <span>Email báo lỗi (tuỳ chọn)</span>
+                <input
+                  type="email"
+                  className="search-input webhook-url-input"
+                  placeholder="ops@example.com"
+                  value={whRegisterEmail}
+                  onChange={(e) => setWhRegisterEmail(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <p className="muted small webhook-types-label">
+                Loại dữ liệu gửi tới URL:
+              </p>
+              <div className="webhook-type-grid">
+                {(whConfig?.webhookTypes ?? [
+                  'orders',
+                  'customers',
+                  'products',
+                  'variations_warehouses',
+                ]).map((t) => (
+                  <label key={t}>
+                    <input
+                      type="checkbox"
+                      checked={whTypes.includes(t)}
+                      onChange={() => toggleWhType(t)}
+                    />
+                    {t}
+                  </label>
+                ))}
+              </div>
+              <div className="webhook-register-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void registerPancakeWebhook()}
+                  disabled={whRegisterBusy || !whConfig?.hasApiKey}
+                >
+                  {whRegisterBusy ? 'Đang gửi…' : 'Gửi cấu hình lên Pancake'}
+                </button>
+                {!whConfig?.hasApiKey && (
+                  <span className="muted small">
+                    Thêm PANCAKE_API_KEY để bật nút này.
+                  </span>
+                )}
+              </div>
+              {whMessage && <p className="hint hint-ok">{whMessage}</p>}
+              {whError && <p className="hint hint-error">{whError}</p>}
+            </section>
+
+            <section className="card" aria-labelledby="wh-events-title">
+              <div className="table-head">
+                <h2 id="wh-events-title" className="section-title">
+                  Sự kiện đã nhận
+                </h2>
+                <div className="table-head-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => void loadWebhookEvents()}
+                    disabled={whEventsLoading}
+                  >
+                    {whEventsLoading ? 'Đang tải…' : 'Làm mới'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => void clearWebhookEvents()}
+                  >
+                    Xóa danh sách
+                  </button>
+                </div>
+              </div>
+              <p className="muted small">
+                Nguồn lưu:{' '}
+                <strong>{whEventsSource || '—'}</strong>
+                {whEventsSource === 'memory'
+                  ? ' (mất khi restart server trừ khi dùng MongoDB).'
+                  : null}
+              </p>
+              {!whEventsLoading && whEvents.length === 0 && (
+                <p className="muted">
+                  Chưa có POST nào. Sau khi bật webhook trên Pancake, thử tạo
+                  đơn hoặc khách — dữ liệu sẽ xuất hiện ở đây.
+                </p>
+              )}
+              {whEvents.length > 0 && (
+                <div className="webhook-events-list">
+                  {whEvents.map((ev) => (
+                    <details key={ev.id} className="webhook-event-card">
+                      <summary>
+                        {ev.receivedAt}
+                        {ev.contentType ? ` · ${ev.contentType}` : ''}
+                      </summary>
+                      <pre className="webhook-payload">
+                        {JSON.stringify(ev.payload, null, 2)}
+                      </pre>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
+        {activeToolId === 'opensource-hrm' && (
+          <>
+            <p className="tool-intro muted">
+              {activeTool.description} Mở Horilla sau khi container chạy; lần
+              đầu cần khởi tạo DB trong container (compose đã chạy migrate).
+            </p>
+            <MeitIntegrationsPanel focus="hrm" />
+          </>
+        )}
+
+        {activeToolId === 'opensource-crm' && (
+          <>
+            <p className="tool-intro muted">
+              {activeTool.description} Đăng nhập admin mặc định theo biến môi
+              trường compose (đổi ngay trong{' '}
+              <code>compose.integrations.env</code> khi deploy thật).
+            </p>
+            <MeitIntegrationsPanel focus="crm" />
           </>
         )}
       </div>

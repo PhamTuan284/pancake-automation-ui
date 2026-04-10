@@ -20,3 +20,42 @@ export type ToolDef = {
   description: string;
   disabled?: boolean;
 };
+
+/** GET /pancake-webhook/config */
+export type PancakeWebhookConfig = {
+  receiverPath: string;
+  publicBaseUrl: string | null;
+  fullReceiverUrl: string | null;
+  shopId: string;
+  hasApiKey: boolean;
+  incomingSecretConfigured: boolean;
+  incomingSecretHeader: string;
+  docUrl: string;
+  webhookTypes: string[];
+};
+
+/** GET /pancake-webhook/events */
+export type PancakeWebhookEventRow = {
+  id: string;
+  receivedAt: string;
+  contentType: string;
+  payload: unknown;
+};
+
+/** GET /integrations — one bundled HRM + CRM stack (Horilla + EspoCRM via Docker). */
+export type IntegrationServiceInfo = {
+  product: string;
+  dockerImage: string;
+  url: string;
+  reachable: boolean;
+  httpStatus?: number;
+  error?: string;
+};
+
+export type IntegrationsBundle = {
+  composeFile: string;
+  envFileExample: string;
+  npmScript: string;
+  hrm: IntegrationServiceInfo;
+  crm: IntegrationServiceInfo;
+};
