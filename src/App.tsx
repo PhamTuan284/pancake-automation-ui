@@ -1662,7 +1662,7 @@ export default function App() {
                 Nguồn lưu:{' '}
                 <strong>{whEventsSource || '—'}</strong>
                 {whEventsSource === 'memory'
-                  ? ' (mất khi restart server trừ khi dùng MongoDB).'
+                  ? ' (mất khi restart server).'
                   : null}
               </p>
               {!whEventsLoading && whEvents.length === 0 && (
