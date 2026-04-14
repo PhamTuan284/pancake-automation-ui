@@ -6,7 +6,7 @@ export const TOOLS: ToolDef[] = [
     id: 'pancake-einvoice',
     label: 'Pancake · Hóa đơn điện tử',
     description:
-      'Điền dữ liệu khách từ Excel / JSON và chạy automation trên POS.',
+      'Điền dữ liệu khách từ Excel và chạy kiểm thử WDIO trên server.',
   },
   {
     id: 'pancake-webhook',

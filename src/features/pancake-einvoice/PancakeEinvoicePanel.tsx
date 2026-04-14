@@ -15,13 +15,15 @@ import {
   rowMatchesQuery,
 } from './invoiceTableUtils';
 
+/** Single WDIO feature file = one Cucumber run from the UI (matches server `spec` body). */
+const UI_WDIO_SINGLE_SPEC =
+  './wdio/features/pancake-einvoice-automation.feature';
+
 export function PancakeEinvoicePanel({
   toolDescription,
 }: {
   toolDescription: string;
 }) {
-  const [status, setStatus] = useState('sẵn sàng');
-  const [message, setMessage] = useState('');
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState('');
@@ -172,36 +174,6 @@ export function PancakeEinvoicePanel({
     void persistInvoiceRows(nextRows);
   };
 
-  const runAutomation = async () => {
-    setStatus('đang chạy');
-    setMessage('');
-    try {
-      const res = await fetch(apiUrl('/run-einvoice-automation'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (res.status === 409) {
-        setStatus('đang bận');
-        setMessage(data.error || 'Automation is already running.');
-        return;
-      }
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-      setStatus('sẵn sàng');
-      setMessage(
-        'Automation run finished. Chrome window should have closed; you can run it again.'
-      );
-    } catch (err) {
-      console.error(err);
-      setStatus('lỗi');
-      setMessage(
-        err instanceof Error
-          ? err.message
-          : 'Could not reach the server. Start the API: npm start in pancake-automation-server.'
-      );
-    }
-  };
-
   const runE2eTests = async () => {
     setE2eStatus('đang chạy');
     setE2eMessage('');
@@ -209,6 +181,7 @@ export function PancakeEinvoicePanel({
       const res = await fetch(apiUrl('/run-e2e-tests'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spec: UI_WDIO_SINGLE_SPEC }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.status === 409) {
@@ -221,7 +194,7 @@ export function PancakeEinvoicePanel({
       }
       setE2eStatus('sẵn sàng');
       setE2eMessage(
-        'Bộ kiểm thử Cucumber/WDIO đã chạy xong (xem log trên terminal server).'
+        'Đã chạy xong một bộ kiểm thử (hóa đơn điện tử). Xem log trên terminal server.'
       );
     } catch (err) {
       console.error(err);
@@ -286,38 +259,20 @@ export function PancakeEinvoicePanel({
 
       <section className="card" aria-labelledby="pancake-run-title">
         <h2 id="pancake-run-title" className="section-title">
-          Chạy automation
+          Tự động phát hành hóa đơn trên Pancake
         </h2>
-        <p className="muted small">
-          Mở trình duyệt điều khiển, đăng nhập POS và lần lượt xử lý các hóa đơn{' '}
-          <strong>Chưa phát hành</strong> khớp dữ liệu khách hàng (API / DB).
-        </p>
         <div className="run-automation-actions">
           <button
             type="button"
             className="btn"
-            onClick={() => void runAutomation()}
-            disabled={status === 'đang chạy' || e2eStatus === 'đang chạy'}
-          >
-            {status === 'đang chạy' ? 'Đang chạy…' : 'Chạy tự động'}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
             onClick={() => void runE2eTests()}
-            disabled={e2eStatus === 'đang chạy' || status === 'đang chạy'}
+            disabled={e2eStatus === 'đang chạy'}
           >
-            {e2eStatus === 'đang chạy'
-              ? 'Đang chạy E2E…'
-              : 'Chạy kiểm thử E2E (Cucumber)'}
+            {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Chạy một kiểm thử'}
           </button>
         </div>
-        <p className="status">
-          Trạng thái automation: <strong>{status}</strong>
-        </p>
-        {message && <p className="hint">{message}</p>}
         <p className="status status-e2e">
-          Trạng thái E2E: <strong>{e2eStatus}</strong>
+          Trạng thái: <strong>{e2eStatus}</strong>
         </p>
         {e2eMessage && <p className="hint">{e2eMessage}</p>}
       </section>
