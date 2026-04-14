@@ -5,8 +5,14 @@ import {
   useState,
   type ChangeEvent,
 } from 'react';
+import TablePagination from '@mui/material/TablePagination';
 import type { CustomerModalState, InvoiceRow } from '../../types';
 import { apiUrl } from '../../lib/api';
+import {
+  UiButton,
+  UiDataTable,
+  type UiDataTableColumn,
+} from '../../components/ui';
 import { TABLE_COLUMNS } from './tableConstants';
 import {
   displayCell,
@@ -18,6 +24,8 @@ import {
 /** Single WDIO feature file = one Cucumber run from the UI (matches server `spec` body). */
 const UI_WDIO_SINGLE_SPEC =
   './wdio/features/pancake-einvoice-automation.feature';
+const DATA_TABLE_DEFAULT_PAGE_SIZE = 20;
+const DATA_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export function PancakeEinvoicePanel({
   toolDescription,
@@ -30,6 +38,10 @@ export function PancakeEinvoicePanel({
   const [uploadStatus, setUploadStatus] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
   const [dataSearch, setDataSearch] = useState('');
+  const [dataPage, setDataPage] = useState(1);
+  const [dataRowsPerPage, setDataRowsPerPage] = useState(
+    DATA_TABLE_DEFAULT_PAGE_SIZE
+  );
   const [customerModal, setCustomerModal] = useState<CustomerModalState | null>(
     null
   );
@@ -52,6 +64,64 @@ export function PancakeEinvoicePanel({
     if (!searchNorm) return withIdx;
     return withIdx.filter(({ row }) => rowMatchesQuery(row, searchNorm));
   }, [rows, searchNorm]);
+  const dataTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRows.length / dataRowsPerPage)
+  );
+  const dataCurrentPage = Math.min(dataPage, dataTotalPages);
+  const pageStartIndex = (dataCurrentPage - 1) * dataRowsPerPage;
+  const pagedRows = useMemo(
+    () => filteredRows.slice(pageStartIndex, pageStartIndex + dataRowsPerPage),
+    [filteredRows, pageStartIndex, dataRowsPerPage]
+  );
+  const invoiceTableColumns: UiDataTableColumn<(typeof pagedRows)[number]>[] = [
+    {
+      key: 'idx',
+      header: '#',
+      headerClassName: 'col-idx',
+      cellClassName: 'col-idx muted-cell',
+      render: (_entry, rowIndex) => pageStartIndex + rowIndex + 1,
+    },
+    ...TABLE_COLUMNS.map((c) => ({
+      key: String(c.key),
+      header: c.label,
+      render: (entry: (typeof pagedRows)[number]) => displayCell(entry.row[c.key]),
+    })),
+    {
+      key: 'actions',
+      header: 'Thao tác',
+      headerClassName: 'col-actions',
+      cellClassName: 'col-actions',
+      render: (entry: (typeof pagedRows)[number]) => (
+        <div className="row-actions">
+          <UiButton
+            variant="tiny"
+            onClick={() => openEditCustomer(entry.origIndex)}
+          >
+            Sửa
+          </UiButton>
+          <UiButton
+            variant="tiny"
+            tone="danger"
+            onClick={() => deleteCustomerAt(entry.origIndex)}
+            disabled={crudSaving}
+          >
+            Xóa
+          </UiButton>
+        </div>
+      ),
+    },
+  ];
+
+  useEffect(() => {
+    setDataPage(1);
+  }, [searchNorm, rows.length]);
+
+  useEffect(() => {
+    if (dataPage > dataTotalPages) {
+      setDataPage(dataTotalPages);
+    }
+  }, [dataPage, dataTotalPages]);
 
   const loadInvoiceData = useCallback(async () => {
     setDataLoading(true);
@@ -262,14 +332,12 @@ export function PancakeEinvoicePanel({
           Tự động phát hành hóa đơn trên Pancake
         </h2>
         <div className="run-automation-actions">
-          <button
-            type="button"
-            className="btn"
+          <UiButton
             onClick={() => void runE2eTests()}
             disabled={e2eStatus === 'đang chạy'}
           >
-            {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Chạy một kiểm thử'}
-          </button>
+            {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Bắt đầu'}
+          </UiButton>
         </div>
         <p className="status status-e2e">
           Trạng thái: <strong>{e2eStatus}</strong>
@@ -291,13 +359,6 @@ export function PancakeEinvoicePanel({
           <strong>thay thế</strong> toàn bộ dữ liệu khách hàng trên server.
         </p>
         <div className="excel-upload-toolbar">
-          <a
-            className="btn-secondary excel-template-link"
-            href={apiUrl('/invoice-excel-template')}
-            download="mau-khach-hang-hoa-don-dien-tu.xlsx"
-          >
-            Tải file mẫu Excel
-          </a>
           <label className="file-label excel-file-label">
             <input
               type="file"
@@ -308,9 +369,16 @@ export function PancakeEinvoicePanel({
             <span className="file-btn">
               {uploadStatus === 'Đang xử lý'
                 ? 'Đang xử lý…'
-                : 'Chọn file .xlsx / .xls'}
+                : 'Tải lên file .xlsx / .xls'}
             </span>
           </label>
+          <a
+            className="btn-secondary excel-template-link"
+            href={apiUrl('/invoice-excel-template')}
+            download="mau-khach-hang-hoa-don-dien-tu.xlsx"
+          >
+            Tải file Excel mẫu
+          </a>
         </div>
         {uploadMessage && (
           <p
@@ -333,13 +401,9 @@ export function PancakeEinvoicePanel({
           </h2>
           {!dataLoading && !dataError && (
             <div className="table-head-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={openAddCustomer}
-              >
+              <UiButton variant="secondary" onClick={openAddCustomer}>
                 + Thêm khách hàng
-              </button>
+              </UiButton>
               <div className="table-head-badges">
                 <span className="badge">{rows.length} khách</span>
                 {searchNorm && rows.length > 0 && (
@@ -409,48 +473,33 @@ export function PancakeEinvoicePanel({
             </p>
           )}
         {!dataLoading && !dataError && filteredRows.length > 0 && (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="col-idx">#</th>
-                  {TABLE_COLUMNS.map((c) => (
-                    <th key={c.key}>{c.label}</th>
-                  ))}
-                  <th className="col-actions">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map(({ row, origIndex }, i) => (
-                  <tr key={origIndex}>
-                    <td className="col-idx muted-cell">{i + 1}</td>
-                    {TABLE_COLUMNS.map((c) => (
-                      <td key={c.key}>{displayCell(row[c.key])}</td>
-                    ))}
-                    <td className="col-actions">
-                      <div className="row-actions">
-                        <button
-                          type="button"
-                          className="btn-tiny"
-                          onClick={() => openEditCustomer(origIndex)}
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-tiny btn-tiny-danger"
-                          onClick={() => deleteCustomerAt(origIndex)}
-                          disabled={crudSaving}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <UiDataTable
+              rows={pagedRows}
+              columns={invoiceTableColumns}
+              rowKey={(entry) => entry.origIndex}
+            />
+            <TablePagination
+              component="div"
+              className="table-pagination"
+              count={filteredRows.length}
+              rowsPerPage={dataRowsPerPage}
+              page={dataCurrentPage - 1}
+              rowsPerPageOptions={DATA_TABLE_PAGE_SIZE_OPTIONS}
+              onPageChange={(_event, newPage) => {
+                setDataPage(newPage + 1);
+              }}
+              onRowsPerPageChange={(event) => {
+                const nextSize = Number(event.target.value);
+                setDataRowsPerPage(nextSize);
+                setDataPage(1);
+              }}
+              labelRowsPerPage="Mỗi trang:"
+              labelDisplayedRows={({ from, to, count }) =>
+                `Hiển thị ${from}-${to} / ${count}`
+              }
+            />
+          </>
         )}
       </section>
 
@@ -508,22 +557,20 @@ export function PancakeEinvoicePanel({
               <p className="hint hint-error modal-error">{crudError}</p>
             )}
             <div className="modal-actions">
-              <button
-                type="button"
-                className="btn-secondary"
+              <UiButton
+                variant="secondary"
                 onClick={closeCustomerModal}
                 disabled={crudSaving}
               >
                 Hủy
-              </button>
-              <button
-                type="button"
-                className="btn btn-modal-save"
+              </UiButton>
+              <UiButton
+                className="btn-modal-save"
                 onClick={() => void saveCustomerForm()}
                 disabled={crudSaving}
               >
                 {crudSaving ? 'Đang lưu…' : 'Lưu'}
-              </button>
+              </UiButton>
             </div>
           </div>
         </div>

@@ -6,6 +6,11 @@ import {
   apiTableColumns,
   extractApiRows,
 } from '../../lib/apiResponse';
+import {
+  UiButton,
+  UiDataTable,
+  type UiDataTableColumn,
+} from '../../components/ui';
 
 export function PancakeWebhookPanel({
   toolDescription,
@@ -49,6 +54,12 @@ export function PancakeWebhookPanel({
       ]),
     [whProductRows]
   );
+  const whProductTableColumns: UiDataTableColumn<(typeof whProductRows)[number]>[] =
+    whProductCols.map((col) => ({
+      key: col,
+      header: col,
+      render: (row) => apiCellText(row[col]),
+    }));
 
   const loadWebhookPanel = useCallback(async () => {
     setWhPanelLoading(true);
@@ -316,14 +327,12 @@ export function PancakeWebhookPanel({
           ))}
         </div>
         <div className="webhook-register-actions">
-          <button
-            type="button"
-            className="btn"
+          <UiButton
             onClick={() => void registerPancakeWebhook()}
             disabled={whRegisterBusy || !whConfig?.hasApiKey}
           >
             {whRegisterBusy ? 'Đang gửi…' : 'Gửi cấu hình lên Pancake'}
-          </button>
+          </UiButton>
           {!whConfig?.hasApiKey && (
             <span className="muted small">
               Thêm PANCAKE_API_KEY để bật nút này.
@@ -340,14 +349,12 @@ export function PancakeWebhookPanel({
             Danh sách sản phẩm
           </h2>
           <div className="table-head-actions">
-            <button
-              type="button"
-              className="btn"
+            <UiButton
               onClick={() => void loadPancakeProductsVariations()}
               disabled={whProductsLoading || !whConfig?.hasApiKey}
             >
               {whProductsLoading ? 'Đang tải…' : 'Tải từ Pancake'}
-            </button>
+            </UiButton>
           </div>
         </div>
         {!whConfig?.hasApiKey && (
@@ -361,30 +368,15 @@ export function PancakeWebhookPanel({
         {whProductsData !== null &&
           !whProductsError &&
           whProductRows.length > 0 && (
-            <div className="table-wrap webhook-openapi-wrap">
-              <table className="data-table data-table--openapi">
-                <thead>
-                  <tr>
-                    {whProductCols.map((col) => (
-                      <th key={col}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {whProductRows.map((row, i) => (
-                    <tr
-                      key={String(
-                        row.variation_id ?? row.id ?? row.sku ?? `prd-${i}`
-                      )}
-                    >
-                      {whProductCols.map((col) => (
-                        <td key={col}>{apiCellText(row[col])}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <UiDataTable
+              rows={whProductRows}
+              columns={whProductTableColumns}
+              rowKey={(row, i) =>
+                String(row.variation_id ?? row.id ?? row.sku ?? `prd-${i}`)
+              }
+              wrapClassName="webhook-openapi-wrap"
+              tableClassName="data-table--openapi"
+            />
           )}
         {whProductsData !== null &&
           !whProductsError &&
@@ -401,21 +393,19 @@ export function PancakeWebhookPanel({
             Sự kiện đã nhận
           </h2>
           <div className="table-head-actions">
-            <button
-              type="button"
-              className="btn-secondary"
+            <UiButton
+              variant="secondary"
               onClick={() => void loadWebhookEvents()}
               disabled={whEventsLoading}
             >
               {whEventsLoading ? 'Đang tải…' : 'Làm mới'}
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
+            </UiButton>
+            <UiButton
+              variant="secondary"
               onClick={() => void clearWebhookEvents()}
             >
               Xóa danh sách
-            </button>
+            </UiButton>
           </div>
         </div>
         <p className="muted small">

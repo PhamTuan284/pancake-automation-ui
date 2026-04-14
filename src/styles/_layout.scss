@@ -5,99 +5,62 @@
   padding: 0 24px 24px;
 }
 
-.app-brand {
-  margin: 0 -24px 24px;
-  padding: 16px 24px;
-  background: linear-gradient(180deg, #020617 0%, t.$bg-page 100%);
-}
-
-.app-brand-inner,
-.tool-nav-inner,
+.app-navbar,
 .layout {
   max-width: 1120px;
+}
+
+.layout {
   margin: 0 auto;
 }
 
-.app-brand-title {
-  margin: 0;
-  font-size: 32px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: #f8fafc;
-  text-align: center;
-}
-
-.app-brand-tagline {
-  margin: 8px 0 0;
-  max-width: 42rem;
-  font-size: 14px;
-  line-height: 1.5;
-  color: t.$text-secondary;
-}
-
-.tool-nav {
-  margin: 0 -24px 16px;
-  padding: 0 24px 12px;
-}
-
-.tool-nav-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tool-nav-list li {
-  margin: 0;
-}
-
-.tool-nav-item {
-  height: t.$control-h;
-  padding: 0 16px;
-  border-radius: t.$radius-sm;
+.app-navbar {
+  margin: 0 auto 18px;
+  border-radius: 0 0 t.$radius-lg t.$radius-lg;
+  overflow: hidden;
   border: 1px solid t.$border-default;
-  background: t.$bg-page;
-  color: #cbd5e1;
-  font: inherit;
-  font-size: 14px;
+  border-top: 0;
+  background: linear-gradient(180deg, #17233b 0%, t.$bg-page 75%);
+}
+
+.app-navbar-toolbar {
+  min-height: 64px !important;
+  padding: 0 16px !important;
+}
+
+.app-navbar-title {
+  color: t.$text-primary;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+}
+
+.app-navbar-tabs-wrap {
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.app-navbar-tabs {
+  min-height: 48px !important;
+}
+
+.app-navbar-tabs .MuiTabs-scroller {
+  padding: 0 8px;
+}
+
+.app-navbar-tabs .MuiTab-root {
+  min-height: 48px;
+  font-size: 13px;
+  color: t.$text-secondary;
+  text-transform: none;
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background t.$trans-fast,
-    border-color t.$trans-fast,
-    color t.$trans-fast,
-    box-shadow t.$trans-fast;
 }
 
-.tool-nav-item:hover {
-  border-color: t.$border-strong;
-  color: #f1f5f9;
-  background: #111c31;
+.app-navbar-tabs .MuiTab-root.Mui-selected {
+  color: #93c5fd;
 }
 
-.tool-nav-item--active {
-  color: #f8fafc;
-  border-color: t.$primary;
-  background: #1e3a5f;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-.tool-nav-item--soon {
-  cursor: default;
-  opacity: 0.7;
-  border-style: dashed;
-}
-
-.tool-nav-soon {
-  margin-left: 8px;
-  font-size: 12px;
-  text-transform: uppercase;
-  color: t.$text-muted;
+.app-navbar-tabs .MuiTabs-indicator {
+  background: t.$primary;
+  height: 3px;
 }
 
 .tool-intro {
@@ -272,14 +235,55 @@ a.excel-template-link,
 }
 
 .table-wrap {
-  max-height: min(60vh, 520px);
+  max-height: min(90vh, 720px);
   overflow-x: auto;
   overflow-y: auto;
-  margin: 0 -8px;
-  padding: 0 8px;
   border-radius: t.$radius-md;
   border: 1px solid t.$border-default;
   background: t.$bg-surface-soft;
+}
+
+.table-pagination {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.table-pagination-info {
+  margin: 0;
+}
+
+.table-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-pagination-page {
+  margin: 0;
+}
+
+.ui-carousel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-carousel-nav {
+  flex: 0 0 auto;
+  width: 40px;
+}
+
+.ui-carousel-track {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
 }
 
 .data-table {
@@ -608,12 +612,11 @@ a.excel-template-link,
     padding: 0 16px 16px;
   }
 
-  .app-brand,
-  .tool-nav {
-    margin-left: -16px;
-    margin-right: -16px;
-    padding-left: 16px;
-    padding-right: 16px;
+  .app-navbar {
+    margin: 0 -16px 16px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
   }
 
   .card {
