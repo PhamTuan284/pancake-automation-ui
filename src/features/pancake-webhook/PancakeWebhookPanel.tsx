@@ -12,6 +12,13 @@ import {
   type UiDataTableColumn,
 } from '../../components/ui';
 
+const DEFAULT_WEBHOOK_TYPES = [
+  'orders',
+  'customers',
+  'products',
+  'variations_warehouses',
+];
+
 export function PancakeWebhookPanel({
   toolDescription,
 }: {
@@ -26,8 +33,8 @@ export function PancakeWebhookPanel({
   const [whMessage, setWhMessage] = useState('');
   const [whError, setWhError] = useState('');
   const [whRegisterUrl, setWhRegisterUrl] = useState('');
-  const [whRegisterEmail, setWhRegisterEmail] = useState('');
-  const [whTypes, setWhTypes] = useState<string[]>(['orders', 'customers']);
+  const [whRegisterEmail, setWhRegisterEmail] = useState('oomrneoo@gmail.com');
+  const [whTypes, setWhTypes] = useState<string[]>(DEFAULT_WEBHOOK_TYPES);
   const [whRegisterBusy, setWhRegisterBusy] = useState(false);
   const [whProductsLoading, setWhProductsLoading] = useState(false);
   const [whProductsError, setWhProductsError] = useState('');
@@ -310,12 +317,7 @@ export function PancakeWebhookPanel({
           Loại dữ liệu gửi tới URL:
         </p>
         <div className="webhook-type-grid">
-          {(whConfig?.webhookTypes ?? [
-            'orders',
-            'customers',
-            'products',
-            'variations_warehouses',
-          ]).map((t) => (
+          {(whConfig?.webhookTypes ?? DEFAULT_WEBHOOK_TYPES).map((t) => (
             <label key={t}>
               <input
                 type="checkbox"
