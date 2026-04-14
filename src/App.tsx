@@ -60,7 +60,7 @@ export default function App() {
 
   return (
     <div className="page">
-      <AppBar position="sticky" className="app-navbar" elevation={0}>
+      <AppBar position="static" className="app-navbar" elevation={0}>
         <Toolbar className="app-navbar-toolbar">
           <Typography
             variant="h5"

@@ -39,6 +39,7 @@ export function PancakeWebhookPanel({
   const [whProductsLoading, setWhProductsLoading] = useState(false);
   const [whProductsError, setWhProductsError] = useState('');
   const [whProductsData, setWhProductsData] = useState<unknown>(null);
+  const [whPingBusy, setWhPingBusy] = useState(false);
 
   const whProductRows = useMemo(
     () => extractApiRows(whProductsData),
@@ -231,6 +232,38 @@ export function PancakeWebhookPanel({
     }
   };
 
+  const pingWebhookIngress = async () => {
+    setWhPingBusy(true);
+    setWhError('');
+    try {
+      const res = await fetch(apiUrl('/pancake-webhook/ping'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payload: {
+            webhook_type: 'orders',
+            id: `ui-ping-${Date.now()}`,
+            customer_id: 'ui-ping-customer',
+            bill_full_name: 'UI Ping',
+            order_sources: ['ui_manual_ping'],
+          },
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || 'Ping webhook thất bại');
+      }
+      await loadWebhookEvents();
+      setWhMessage('Đã gửi ping webhook và ghi nhận sự kiện test.');
+      setTimeout(() => setWhMessage(''), 3200);
+    } catch (err) {
+      console.error(err);
+      setWhError(err instanceof Error ? err.message : 'Ping webhook thất bại.');
+    } finally {
+      setWhPingBusy(false);
+    }
+  };
+
   return (
     <>
       <p className="tool-intro muted">
@@ -407,6 +440,13 @@ export function PancakeWebhookPanel({
               onClick={() => void clearWebhookEvents()}
             >
               Xóa danh sách
+            </UiButton>
+            <UiButton
+              variant="secondary"
+              onClick={() => void pingWebhookIngress()}
+              disabled={whPingBusy}
+            >
+              {whPingBusy ? 'Đang ping…' : 'Ping webhook'}
             </UiButton>
           </div>
         </div>
