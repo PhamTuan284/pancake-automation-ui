@@ -14,16 +14,4 @@ export const TOOLS: ToolDef[] = [
     description:
       'Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API.',
   },
-  {
-    id: 'opensource-hrm',
-    label: 'HRM · Horilla',
-    description:
-      'Nhân sự mã nguồn mở (Horilla) — chạy bằng Docker trong monorepo MeiT Tools.',
-  },
-  {
-    id: 'opensource-crm',
-    label: 'CRM · EspoCRM',
-    description:
-      'CRM mã nguồn mở (EspoCRM) — chạy bằng Docker trong monorepo MeiT Tools.',
-  },
 ];

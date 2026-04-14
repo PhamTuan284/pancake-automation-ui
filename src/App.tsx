@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { TOOLS } from './config/tools';
-import { MeitIntegrationsPanel } from './components/integrations/MeitIntegrationsPanel';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
 import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
 
@@ -62,27 +61,6 @@ export default function App() {
 
         {activeToolId === 'pancake-webhook' && (
           <PancakeWebhookPanel toolDescription={activeTool.description} />
-        )}
-
-        {activeToolId === 'opensource-hrm' && (
-          <>
-            <p className="tool-intro muted">
-              {activeTool.description} Mở Horilla sau khi container chạy; lần
-              đầu cần khởi tạo DB trong container (compose đã chạy migrate).
-            </p>
-            <MeitIntegrationsPanel focus="hrm" />
-          </>
-        )}
-
-        {activeToolId === 'opensource-crm' && (
-          <>
-            <p className="tool-intro muted">
-              {activeTool.description} Đăng nhập admin mặc định theo biến môi
-              trường compose (đổi ngay trong{' '}
-              <code>compose.integrations.env</code> khi deploy thật).
-            </p>
-            <MeitIntegrationsPanel focus="crm" />
-          </>
         )}
       </div>
     </div>
