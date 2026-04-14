@@ -18,6 +18,23 @@ const DEFAULT_WEBHOOK_TYPES = [
   'products',
   'variations_warehouses',
 ];
+const WEBHOOK_KIND_ORDER = [
+  'orders',
+  'customers',
+  'products',
+  'variations_warehouses',
+  'crm',
+  'unknown',
+];
+
+function webhookKindLabel(kind: string): string {
+  if (kind === 'orders') return 'Đơn hàng';
+  if (kind === 'customers') return 'Khách hàng';
+  if (kind === 'products') return 'Sản phẩm';
+  if (kind === 'variations_warehouses') return 'Tồn kho';
+  if (kind === 'crm') return 'CRM';
+  return `Khác (${kind})`;
+}
 
 export function PancakeWebhookPanel({
   toolDescription,
@@ -68,6 +85,29 @@ export function PancakeWebhookPanel({
       header: col,
       render: (row) => apiCellText(row[col]),
     }));
+  const whEventsGrouped = useMemo(() => {
+    const map = new Map<string, PancakeWebhookEventRow[]>();
+    for (const ev of whEvents) {
+      const kind = (ev.kind || 'unknown').trim() || 'unknown';
+      const arr = map.get(kind) ?? [];
+      arr.push(ev);
+      map.set(kind, arr);
+    }
+    const known = WEBHOOK_KIND_ORDER.filter((k) => map.has(k)).map((k) => ({
+      kind: k,
+      label: webhookKindLabel(k),
+      events: map.get(k) ?? [],
+    }));
+    const others = [...map.entries()]
+      .filter(([k]) => !WEBHOOK_KIND_ORDER.includes(k))
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([kind, events]) => ({
+        kind,
+        label: webhookKindLabel(kind),
+        events,
+      }));
+    return [...known, ...others];
+  }, [whEvents]);
 
   const loadWebhookPanel = useCallback(async () => {
     setWhPanelLoading(true);
@@ -464,16 +504,23 @@ export function PancakeWebhookPanel({
         )}
         {whEvents.length > 0 && (
           <div className="webhook-events-list">
-            {whEvents.map((ev) => (
-              <details key={ev.id} className="webhook-event-card">
-                <summary>
-                  {ev.receivedAt}
-                  {ev.contentType ? ` · ${ev.contentType}` : ''}
-                </summary>
-                <pre className="webhook-payload">
-                  {JSON.stringify(ev.payload, null, 2)}
-                </pre>
-              </details>
+            {whEventsGrouped.map((group) => (
+              <div key={group.kind} className="webhook-kind-group">
+                <p className="muted small webhook-kind-title">
+                  {group.label}: <strong>{group.events.length}</strong> sự kiện
+                </p>
+                {group.events.map((ev) => (
+                  <details key={ev.id} className="webhook-event-card">
+                    <summary>
+                      {ev.receivedAt}
+                      {ev.contentType ? ` · ${ev.contentType}` : ''}
+                    </summary>
+                    <pre className="webhook-payload">
+                      {JSON.stringify(ev.payload, null, 2)}
+                    </pre>
+                  </details>
+                ))}
+              </div>
             ))}
           </div>
         )}

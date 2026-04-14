@@ -507,6 +507,17 @@ a.excel-template-link,
   margin-top: 12px;
 }
 
+.webhook-kind-group {
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-md;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.webhook-kind-title {
+  margin: 2px 4px 8px;
+}
+
 .webhook-event-card {
   border: 1px solid t.$border-default;
   border-radius: t.$radius-md;

@@ -38,6 +38,7 @@ export type PancakeWebhookConfig = {
 export type PancakeWebhookEventRow = {
   id: string;
   receivedAt: string;
+  kind: string;
   contentType: string;
   payload: unknown;
 };
