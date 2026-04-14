@@ -18,6 +18,11 @@ RUN npm ci
 # Copy local code to the container image.
 COPY . ./
 
+# Baked at build time (Vite). Set in Railway as a service variable used at build, or:
+#   docker build --build-arg VITE_API_BASE_URL=https://your-api.example.com .
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Build the app.
 RUN npm run build
 

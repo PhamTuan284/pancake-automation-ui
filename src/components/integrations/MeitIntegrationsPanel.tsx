@@ -40,13 +40,13 @@ export function MeitIntegrationsPanel({ focus }: { focus: 'hrm' | 'crm' }) {
     <>
       <section className="card" aria-labelledby="meit-int-run-title">
         <h2 id="meit-int-run-title" className="section-title">
-          Chạy stack trong repo MeiT Tools
+          Chạy stack HRM / CRM (Docker)
         </h2>
         <p className="muted small">
           <strong>Horilla</strong> (HRM) và <strong>EspoCRM</strong> (CRM) được
           đóng gói trong{' '}
           <code>{bundle?.composeFile ?? 'docker-compose.integrations.yml'}</code>
-          . Từ thư mục gốc monorepo:
+          . Trong repo API (<code>pancake-automation-server</code>):
         </p>
         <pre className="webhook-payload integration-cli-snippet">
           npm run integrations:up
@@ -57,7 +57,7 @@ export function MeitIntegrationsPanel({ focus }: { focus: 'hrm' | 'crm' }) {
             {bundle?.envFileExample ?? 'compose.integrations.env.example'}
           </code>{' '}
           → <code>compose.integrations.env</code> (đã liệt kê trong{' '}
-          <code>.gitignore</code>), chỉnh mật khẩu, rồi chạy{' '}
+          <code>.gitignore</code> của repo API), chỉnh mật khẩu, rồi chạy{' '}
           <code>
             docker compose -f docker-compose.integrations.yml --env-file
             compose.integrations.env up -d
