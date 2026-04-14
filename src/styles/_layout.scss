@@ -361,6 +361,17 @@ a.excel-template-link,
   color: t.$text-primary;
 }
 
+.run-automation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.status-e2e {
+  margin-top: 16px;
+}
+
 .hint {
   margin: 12px 0 0;
   color: #cbd5e1;

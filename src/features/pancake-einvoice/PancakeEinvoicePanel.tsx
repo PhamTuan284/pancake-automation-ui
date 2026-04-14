@@ -37,6 +37,8 @@ export function PancakeEinvoicePanel({
   const [crudSaving, setCrudSaving] = useState(false);
   const [crudError, setCrudError] = useState('');
   const [crudMessage, setCrudMessage] = useState('');
+  const [e2eStatus, setE2eStatus] = useState('sẵn sàng');
+  const [e2eMessage, setE2eMessage] = useState('');
 
   const searchNorm = useMemo(
     () => dataSearch.trim().toLocaleLowerCase('vi-VN'),
@@ -200,6 +202,38 @@ export function PancakeEinvoicePanel({
     }
   };
 
+  const runE2eTests = async () => {
+    setE2eStatus('đang chạy');
+    setE2eMessage('');
+    try {
+      const res = await fetch(apiUrl('/run-e2e-tests'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 409) {
+        setE2eStatus('đang bận');
+        setE2eMessage(data.error || 'Job is already running.');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.error || 'E2E run failed');
+      }
+      setE2eStatus('sẵn sàng');
+      setE2eMessage(
+        'Bộ kiểm thử Cucumber/WDIO đã chạy xong (xem log trên terminal server).'
+      );
+    } catch (err) {
+      console.error(err);
+      setE2eStatus('lỗi');
+      setE2eMessage(
+        err instanceof Error
+          ? err.message
+          : 'Không gọi được API. Chạy npm start trong pancake-automation-server.'
+      );
+    }
+  };
+
   const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -258,18 +292,34 @@ export function PancakeEinvoicePanel({
           Mở trình duyệt điều khiển, đăng nhập POS và lần lượt xử lý các hóa đơn{' '}
           <strong>Chưa phát hành</strong> khớp dữ liệu khách hàng (API / DB).
         </p>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => void runAutomation()}
-          disabled={status === 'đang chạy'}
-        >
-          {status === 'đang chạy' ? 'Đang chạy…' : 'Chạy tự động'}
-        </button>
+        <div className="run-automation-actions">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void runAutomation()}
+            disabled={status === 'đang chạy' || e2eStatus === 'đang chạy'}
+          >
+            {status === 'đang chạy' ? 'Đang chạy…' : 'Chạy tự động'}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void runE2eTests()}
+            disabled={e2eStatus === 'đang chạy' || status === 'đang chạy'}
+          >
+            {e2eStatus === 'đang chạy'
+              ? 'Đang chạy E2E…'
+              : 'Chạy kiểm thử E2E (Cucumber)'}
+          </button>
+        </div>
         <p className="status">
-          Trạng thái: <strong>{status}</strong>
+          Trạng thái automation: <strong>{status}</strong>
         </p>
         {message && <p className="hint">{message}</p>}
+        <p className="status status-e2e">
+          Trạng thái E2E: <strong>{e2eStatus}</strong>
+        </p>
+        {e2eMessage && <p className="hint">{e2eMessage}</p>}
       </section>
 
       <section className="card" aria-labelledby="pancake-excel-title">
