@@ -42,3 +42,45 @@ export type PancakeWebhookEventRow = {
   payload: unknown;
 };
 
+export type SalaryInputDraft = {
+  employeeName: string;
+  baseSalary: number;
+  workDays: number;
+  standardWorkDays: number;
+  overtimeWeekdayHours: number;
+  overtimeWeekendHours: number;
+  overtimeHolidayHours: number;
+  allowance: number;
+  bonus: number;
+  otherAddition: number;
+  latePenalty: number;
+  otherDeduction: number;
+  advancePayment: number;
+  insuranceRate: number;
+  personalDeduction: number;
+  dependentCount: number;
+  dependentDeductionPerPerson: number;
+};
+
+export type SalaryResult = {
+  employeeName: string;
+  baseSalary: number;
+  proratedSalary: number;
+  overtimePay: number;
+  overtimePayWeekday: number;
+  overtimePayWeekend: number;
+  overtimePayHoliday: number;
+  allowance: number;
+  bonus: number;
+  otherAddition: number;
+  grossIncome: number;
+  insuranceDeduction: number;
+  taxableIncome: number;
+  pitTax: number;
+  latePenalty: number;
+  otherDeduction: number;
+  advancePayment: number;
+  totalDeduction: number;
+  netIncome: number;
+};
+

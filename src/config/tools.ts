@@ -14,4 +14,10 @@ export const TOOLS: ToolDef[] = [
     description:
       'Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API.',
   },
+  {
+    id: 'salary-calc',
+    label: 'HRM · Tính lương',
+    description:
+      'Tính lương nhân viên theo công, OT, phụ cấp, khấu trừ và thuế TNCN.',
+  },
 ];

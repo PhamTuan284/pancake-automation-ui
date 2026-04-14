@@ -587,6 +587,34 @@ a.excel-template-link,
   margin: 0;
 }
 
+.salary-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 14px;
+}
+
+.salary-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.salary-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-sm;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.salary-negative {
+  color: #fca5a5;
+}
+
 // Pancake Open API lists: default .data-table uses width:100% + max-width on td +
 // word-break:break-word, so many columns become ultra-narrow and UUIDs wrap per character.
 .webhook-openapi-wrap .data-table--openapi {
