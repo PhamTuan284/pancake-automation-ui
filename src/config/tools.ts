@@ -1,13 +1,13 @@
 import type { ToolDef } from '../types';
+import { INVOICE_SHOPS } from './invoiceShops';
 
 /** Registered tools; add entries here as new UIs ship. */
 export const TOOLS: ToolDef[] = [
-  {
-    id: 'pancake-einvoice',
-    label: 'Pancake · Hóa đơn điện tử',
-    description:
-      'Điền dữ liệu khách từ Excel và tự động phát hành hóa đơn trên Pancake.',
-  },
+  ...INVOICE_SHOPS.map((shop) => ({
+    id: shop.toolId,
+    label: shop.label,
+    description: `Điền dữ liệu khách (${shop.shopKey === 'dpa' ? 'cửa hàng DPA' : 'cửa hàng MeiT'}) và tự động phát hành hóa đơn trên Pancake.`,
+  })),
   {
     id: 'pancake-webhook',
     label: 'Pancake · Webhook',

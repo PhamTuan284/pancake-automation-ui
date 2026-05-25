@@ -1,38 +1,53 @@
-# Feature: Pancake · Hóa đơn điện tử
+# Feature: Pancake · Hóa đơn điện tử (DPA & MeiT)
 
-**Tool ID:** `pancake-einvoice`  
-**Đăng ký:** `src/config/tools.ts`  
-**UI:** `src/features/pancake-einvoice/PancakeEinvoicePanel.tsx`  
-**Cột bảng / parse:** `tableConstants.ts`, `invoiceTableUtils.ts`
+**Tool IDs:** `pancake-einvoice-meit`, `pancake-einvoice-dpa`  
+**Đăng ký:** `src/config/tools.ts`, `src/config/invoiceShops.ts`  
+**UI:** `src/features/pancake-einvoice/PancakeEinvoicePanel.tsx` (prop `shopKey`)
 
 ## Mục đích
 
-Điền dữ liệu khách hàng (từ Excel hoặc form), quản lý danh sách trên server, và kích hoạt **tự động phát hành hóa đơn** trên Pancake thông qua job E2E (WebdriverIO) trên server.
+Hai tab riêng cho **cửa hàng MeiT** và **cửa hàng DPA**: danh sách khách hàng tách MongoDB, đăng nhập Pancake và tự động hóa đơn theo shop tương ứng.
 
 ## Hành vi UI (phải giữ nhất quán)
 
-1. **Giới thiệu:** hiển thị `toolDescription` từ `TOOLS` và link mở e-invoices Pancake (`pos.pancake.vn/.../e-invoices`).
-2. **Tự động phát hành:** nút chạy E2E; trạng thái `sẵn sàng` / `đang chạy` / `đang bận` / `lỗi`; body POST cố định `spec: './wdio/features/pancake-einvoice-automation.feature'` (một feature file = một lần chạy Cucumber).
-3. **Excel:** upload `.xlsx`/`.xls`; dòng đầu là header đúng thứ tự; **sheet đầu**; mỗi lần upload **thay thế toàn bộ** dữ liệu khách trên server. Link tải mẫu: `GET` template qua `apiUrl('/invoice-excel-template')`.
-4. **Dữ liệu hiện tại:** tải danh sách từ API; tìm kiếm client-side; phân trang (10/20/50/100); thêm / sửa / xóa khách qua modal; validate lưu: ít nhất **Tên khách hàng** hoặc **Tên đơn vị**; xóa có `confirm`.
+Giống mô tả trước (Excel, CRUD, E2E), nhưng mọi API qua prefix:
+
+`/pancake-einvoice/{shopKey}/…` với `shopKey` = `meit` | `dpa`.
 
 ## API client (contract)
 
 | Thao tác | Method | Path (qua `apiUrl`) |
 |----------|--------|---------------------|
-| Tải dữ liệu | GET | `/invoice-data` |
-| Lưu toàn bộ dòng | PUT | `/invoice-data` — body `{ rows: InvoiceRow[] }` |
-| Upload Excel | POST | `/upload-invoice-excel` — `FormData` field `file` |
-| Tải file mẫu | GET | `/invoice-excel-template` |
-| Chạy E2E | POST | `/run-e2e-tests` — body `{ spec: string }`; `409` = job đang chạy |
+| Cấu hình shop | GET | `/pancake-einvoice/{shopKey}/config` |
+| Tải dữ liệu | GET | `/pancake-einvoice/{shopKey}/invoice-data` |
+| Lưu toàn bộ dòng | PUT | `/pancake-einvoice/{shopKey}/invoice-data` |
+| Upload Excel | POST | `/pancake-einvoice/{shopKey}/upload-invoice-excel` |
+| Tải file mẫu | GET | `/pancake-einvoice/{shopKey}/invoice-excel-template` |
+| Chạy E2E | POST | `/pancake-einvoice/{shopKey}/run-e2e-tests` — body `{ spec, shop?, meitVariant?: "mode" \| "daily" }` (MeiT tab) |
 
-## Kiểu dữ liệu (`src/types.ts`)
+Đường dẫn cũ không có `{shopKey}` vẫn trỏ **MeiT** (`meit`).
 
-- `InvoiceRow`: các key `ColumnKey` — `buyerName`, `operationName`, `taxCode`, `phone`, `idNumber`, `address`, `businessLicense` (chuỗi, đồng bộ với server).
+## MongoDB
 
-## Quy tắc tuân thủ khi sửa code
+| Shop | Collection |
+|------|------------|
+| MeiT | `invoice_clients_meit` |
+| DPA | `invoice_clients_dpa` |
 
-- Không đổi ý nghĩa upload **replace-all** mà không cập nhật tài liệu và copy UI cảnh báo cho người dùng.
-- Cột bảng: giữ đồng bộ `TABLE_COLUMNS` với payload server và tiêu đề Excel.
-- Truy cập: dùng `UiButton`, `UiDataTable`; màu/spacing theo [DESIGN_RULES.md](../DESIGN_RULES.md).
-- Lỗi mạng: thông báo gợi ý chạy `pancake-automation-server` khi không kết nối được API.
+## Env server (`.env`)
+
+| Shop | Shop ID | Login |
+|------|---------|--------|
+| MeiT | `PANCAKE_MEIT_SHOP_ID` (hoặc `PANCAKE_SHOP_ID`) | `PANCAKE_MEIT_LOGIN_PHONE` / `PANCAKE_MEIT_LOGIN_PASSWORD` (hoặc `PANCAKE_LOGIN_*`) |
+| DPA | `PANCAKE_DPA_SHOP_ID` | `PANCAKE_DPA_LOGIN_PHONE` / `PANCAKE_DPA_LOGIN_PASSWORD` |
+
+**MeiT tab — hai cửa hàng Pancake (cùng danh sách khách Mongo):**
+
+| Target | Shop ID | API key (Open API / webhook) |
+|--------|---------|------------------------------|
+| MeiT Mode | `PANCAKE_MEIT_MODE_SHOP_ID` (fallback `PANCAKE_MEIT_SHOP_ID`) | `PANCAKE_MEIT_MODE_API_KEY` (fallback `PANCAKE_MEIT_API_KEY`) |
+| MeiT Daily | `PANCAKE_MEIT_DAILY_SHOP_ID` | `PANCAKE_MEIT_DAILY_API_KEY` |
+
+Open API (tab Webhook): `PANCAKE_MEIT_API_KEY` / `PANCAKE_DPA_API_KEY` (MeiT có thể dùng `PANCAKE_API_KEY` cũ).
+
+E2E: `PANCAKE_ACTIVE_INVOICE_SHOP=meit` + `PANCAKE_ACTIVE_MEIT_VARIANT=mode|daily`.

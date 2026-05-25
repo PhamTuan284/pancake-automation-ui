@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { PancakeWebhookConfig, PancakeWebhookEventRow } from '../../types';
+import type {
+  PancakeWebhookConfig,
+  PancakeWebhookEventRow,
+  PancakeWebhookShopConfig,
+  VariantSalesAnalytics,
+  VariantSalesRow,
+} from '../../types';
 import { apiUrl } from '../../lib/api';
 import {
   apiCellText,
@@ -36,12 +42,66 @@ function webhookKindLabel(kind: string): string {
   return `Khác (${kind})`;
 }
 
+type AnalyticsSortKey =
+  | 'hotRank'
+  | 'productCode'
+  | 'variantCode'
+  | 'soldInWindow'
+  | 'avgSoldPerDay'
+  | 'currentStock'
+  | 'daysUntilSellOut';
+
+function normalizeAnalyticsSearch(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function variantRowMatchesSearch(row: VariantSalesRow, queryNorm: string): boolean {
+  if (!queryNorm) return true;
+  const haystack = [row.productCode, row.variantCode]
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(queryNorm);
+}
+
+function compareAnalyticsRows(
+  a: VariantSalesRow,
+  b: VariantSalesRow,
+  key: AnalyticsSortKey,
+  dir: 'asc' | 'desc'
+): number {
+  const sign = dir === 'asc' ? 1 : -1;
+  if (key === 'productCode' || key === 'variantCode') {
+    const av = (a[key] || '').toLowerCase();
+    const bv = (b[key] || '').toLowerCase();
+    return av.localeCompare(bv, 'vi') * sign;
+  }
+  const numKey = key as
+    | 'hotRank'
+    | 'soldInWindow'
+    | 'avgSoldPerDay'
+    | 'currentStock'
+    | 'daysUntilSellOut';
+  const nullLast = dir === 'asc' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  const av = a[numKey];
+  const bv = b[numKey];
+  const an =
+    av == null || !Number.isFinite(Number(av)) ? nullLast : Number(av);
+  const bn =
+    bv == null || !Number.isFinite(Number(bv)) ? nullLast : Number(bv);
+  if (an !== bn) return (an - bn) * sign;
+  return (
+    (a.variantCode || '').localeCompare(b.variantCode || '', 'vi') * sign
+  );
+}
+
 export function PancakeWebhookPanel({
   toolDescription,
 }: {
   toolDescription: string;
 }) {
   const [whConfig, setWhConfig] = useState<PancakeWebhookConfig | null>(null);
+  const [whSelectedShop, setWhSelectedShop] =
+    useState<PancakeWebhookShopConfig['shopKey']>('meit');
   const [whConfigError, setWhConfigError] = useState('');
   const [whEvents, setWhEvents] = useState<PancakeWebhookEventRow[]>([]);
   const [whEventsSource, setWhEventsSource] = useState('');
@@ -57,6 +117,27 @@ export function PancakeWebhookPanel({
   const [whProductsError, setWhProductsError] = useState('');
   const [whProductsData, setWhProductsData] = useState<unknown>(null);
   const [whPingBusy, setWhPingBusy] = useState(false);
+  const [whAnalyticsDays, setWhAnalyticsDays] = useState(7);
+  const [whAnalyticsLoading, setWhAnalyticsLoading] = useState(false);
+  const [whAnalyticsError, setWhAnalyticsError] = useState('');
+  const [whAnalytics, setWhAnalytics] = useState<VariantSalesAnalytics | null>(
+    null
+  );
+  const [whAnalyticsSearch, setWhAnalyticsSearch] = useState('');
+  const [whAnalyticsSortKey, setWhAnalyticsSortKey] =
+    useState<AnalyticsSortKey>('hotRank');
+  const [whAnalyticsSortDir, setWhAnalyticsSortDir] = useState<'asc' | 'desc'>(
+    'asc'
+  );
+
+  const whActiveShop = useMemo(() => {
+    const shops = whConfig?.shops ?? [];
+    return (
+      shops.find((s) => s.shopKey === whSelectedShop) ??
+      shops[0] ??
+      null
+    );
+  }, [whConfig?.shops, whSelectedShop]);
 
   const whProductRows = useMemo(
     () => extractApiRows(whProductsData),
@@ -79,6 +160,119 @@ export function PancakeWebhookPanel({
       ]),
     [whProductRows]
   );
+  const formatQty = (n: number | null | undefined) =>
+    n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('vi-VN');
+
+  const loadVariantSalesAnalytics = useCallback(async () => {
+    setWhAnalyticsLoading(true);
+    setWhAnalyticsError('');
+    try {
+      const res = await fetch(
+        apiUrl(
+          `/pancake-webhook/analytics/variant-sales?days=${whAnalyticsDays}&eventLimit=1000&shop=${whSelectedShop}`
+        )
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        analytics?: VariantSalesAnalytics;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải phân tích bán hàng');
+      }
+      setWhAnalytics(data.analytics ?? null);
+      setWhAnalyticsSearch('');
+      setWhAnalyticsSortKey('hotRank');
+      setWhAnalyticsSortDir('asc');
+    } catch (err) {
+      console.error(err);
+      setWhAnalytics(null);
+      setWhAnalyticsError(
+        err instanceof Error
+          ? err.message
+          : 'Không tải được phân tích biến thể.'
+      );
+    } finally {
+      setWhAnalyticsLoading(false);
+    }
+  }, [whAnalyticsDays, whSelectedShop]);
+
+  const whAnalyticsSearchNorm = useMemo(
+    () => normalizeAnalyticsSearch(whAnalyticsSearch),
+    [whAnalyticsSearch]
+  );
+
+  const whAnalyticsDisplayRows = useMemo(() => {
+    const rows = whAnalytics?.variants ?? [];
+    const filtered = rows.filter((row) =>
+      variantRowMatchesSearch(row, whAnalyticsSearchNorm)
+    );
+    return [...filtered].sort((a, b) =>
+      compareAnalyticsRows(a, b, whAnalyticsSortKey, whAnalyticsSortDir)
+    );
+  }, [
+    whAnalytics,
+    whAnalyticsSearchNorm,
+    whAnalyticsSortKey,
+    whAnalyticsSortDir,
+  ]);
+
+  const whAnalyticsColumns: UiDataTableColumn<VariantSalesRow>[] = useMemo(
+    () => [
+      {
+        key: 'hotRank',
+        header: 'Hot',
+        sortable: true,
+        render: (row) => String(row.hotRank),
+      },
+      {
+        key: 'productCode',
+        header: 'Mã SP',
+        sortable: true,
+        render: (row) => row.productCode || '—',
+      },
+      {
+        key: 'variantCode',
+        header: 'Mã biến thể',
+        sortable: true,
+        render: (row) => row.variantCode || '—',
+      },
+      {
+        key: 'soldInWindow',
+        header: 'Đã bán (kỳ)',
+        sortable: true,
+        render: (row) => formatQty(row.soldInWindow),
+      },
+      {
+        key: 'avgSoldPerDay',
+        header: 'TB / ngày',
+        sortable: true,
+        render: (row) => formatQty(row.avgSoldPerDay),
+      },
+      {
+        key: 'currentStock',
+        header: 'Tồn',
+        sortable: true,
+        render: (row) => formatQty(row.currentStock),
+      },
+      {
+        key: 'daysUntilSellOut',
+        header: 'Ước hết (~ngày)',
+        sortable: true,
+        render: (row) => formatQty(row.daysUntilSellOut),
+      },
+    ],
+    []
+  );
+
+  const handleAnalyticsSortChange = useCallback(
+    (next: { key: string; dir: 'asc' | 'desc' }) => {
+      setWhAnalyticsSortKey(next.key as AnalyticsSortKey);
+      setWhAnalyticsSortDir(next.dir);
+    },
+    []
+  );
+
   const whProductTableColumns: UiDataTableColumn<(typeof whProductRows)[number]>[] =
     whProductCols.map((col) => ({
       key: col,
@@ -180,7 +374,11 @@ export function PancakeWebhookPanel({
     setWhProductsLoading(true);
     setWhProductsError('');
     try {
-      const res = await fetch(apiUrl('/pancake-webhook/products/variations'));
+      const res = await fetch(
+        apiUrl(
+          `/pancake-webhook/products/variations?shop=${whSelectedShop}`
+        )
+      );
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         data?: unknown;
@@ -219,6 +417,7 @@ export function PancakeWebhookPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          shopKey: whSelectedShop,
           webhook_url: url,
           webhook_enable: true,
           webhook_types: whTypes,
@@ -331,12 +530,15 @@ export function PancakeWebhookPanel({
         {!whPanelLoading && whConfig && (
           <>
             <p className="muted small">
-              Shop ID (server): <code>{whConfig.shopId}</code>
-              {whConfig.hasApiKey
-                ? ' · API key: đã cấu hình'
-                : ' · API key: chưa có — cần PANCAKE_API_KEY để đăng ký từ UI'}
+              {whConfig.shops?.map((s) => (
+                <span key={s.shopKey}>
+                  {s.label}: shop <code>{s.shopId}</code>
+                  {s.hasApiKey ? ' · API key ✓' : ' · API key ✗'}
+                  {' · '}
+                </span>
+              ))}
               {whConfig.incomingSecretConfigured
-                ? ` · Bảo vệ POST: header ${whConfig.incomingSecretHeader}`
+                ? `Bảo vệ POST: header ${whConfig.incomingSecretHeader}`
                 : ''}
             </p>
             {whConfig.fullReceiverUrl ? (
@@ -361,9 +563,29 @@ export function PancakeWebhookPanel({
         </h2>
         <p className="muted small">
           Gọi <code>PUT …/api/v1/shops/&#123;shop&#125;?api_key=…</code> như tài
-          liệu Pancake. Cần <code>PANCAKE_API_KEY</code> và{' '}
-          <code>PANCAKE_SHOP_ID</code> trong .env của server.
+          liệu Pancake. Mỗi shop dùng API key riêng:{' '}
+          <code>PANCAKE_MEIT_API_KEY</code>, <code>PANCAKE_DPA_API_KEY</code>{' '}
+          (MeiT có thể dùng <code>PANCAKE_API_KEY</code> cũ).
         </p>
+        <div className="webhook-register-field">
+          <span>Cửa hàng</span>
+          <select
+            className="search-input"
+            value={whSelectedShop}
+            onChange={(e) =>
+              setWhSelectedShop(
+                e.target.value as PancakeWebhookShopConfig['shopKey']
+              )
+            }
+          >
+            {(whConfig?.shops ?? []).map((s) => (
+              <option key={s.shopKey} value={s.shopKey}>
+                {s.label} ({s.shopId})
+                {s.hasApiKey ? '' : ' — chưa có API key'}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="webhook-register-field">
           <span>Webhook URL (HTTPS)</span>
           <input
@@ -404,13 +626,17 @@ export function PancakeWebhookPanel({
         <div className="webhook-register-actions">
           <UiButton
             onClick={() => void registerPancakeWebhook()}
-            disabled={whRegisterBusy || !whConfig?.hasApiKey}
+            disabled={whRegisterBusy || !whActiveShop?.hasApiKey}
           >
             {whRegisterBusy ? 'Đang gửi…' : 'Gửi cấu hình lên Pancake'}
           </UiButton>
-          {!whConfig?.hasApiKey && (
+          {!whActiveShop?.hasApiKey && (
             <span className="muted small">
-              Thêm PANCAKE_API_KEY để bật nút này.
+              Thêm API key cho shop đã chọn (
+              {whSelectedShop === 'dpa'
+                ? 'PANCAKE_DPA_API_KEY'
+                : 'PANCAKE_MEIT_API_KEY hoặc PANCAKE_API_KEY'}
+              ).
             </span>
           )}
         </div>
@@ -424,17 +650,34 @@ export function PancakeWebhookPanel({
             Danh sách sản phẩm
           </h2>
           <div className="table-head-actions">
+            <label className="muted small">
+              Shop{' '}
+              <select
+                value={whSelectedShop}
+                onChange={(e) =>
+                  setWhSelectedShop(
+                    e.target.value as PancakeWebhookShopConfig['shopKey']
+                  )
+                }
+              >
+                {(whConfig?.shops ?? []).map((s) => (
+                  <option key={s.shopKey} value={s.shopKey}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <UiButton
               onClick={() => void loadPancakeProductsVariations()}
-              disabled={whProductsLoading || !whConfig?.hasApiKey}
+              disabled={whProductsLoading || !whActiveShop?.hasApiKey}
             >
               {whProductsLoading ? 'Đang tải…' : 'Tải từ Pancake'}
             </UiButton>
           </div>
         </div>
-        {!whConfig?.hasApiKey && (
+        {!whActiveShop?.hasApiKey && (
           <p className="muted small">
-            Thêm <code>PANCAKE_API_KEY</code> trên server để bật nút tải.
+            Thêm API key cho shop đã chọn trên server.
           </p>
         )}
         {whProductsError && (
@@ -460,6 +703,140 @@ export function PancakeWebhookPanel({
               {JSON.stringify(whProductsData, null, 2)}
             </pre>
           )}
+      </section>
+
+      <section className="card" aria-labelledby="wh-analytics-title">
+        <div className="table-head">
+          <h2 id="wh-analytics-title" className="section-title">
+            Biến thể bán chạy &amp; dự báo hết hàng
+          </h2>
+          <div className="table-head-actions">
+            <label className="muted small">
+              Shop{' '}
+              <select
+                value={whSelectedShop}
+                onChange={(e) =>
+                  setWhSelectedShop(
+                    e.target.value as PancakeWebhookShopConfig['shopKey']
+                  )
+                }
+              >
+                {(whConfig?.shops ?? []).map((s) => (
+                  <option key={s.shopKey} value={s.shopKey}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="muted small">
+              Số ngày{' '}
+              <select
+                value={whAnalyticsDays}
+                onChange={(e) => setWhAnalyticsDays(Number(e.target.value))}
+              >
+                <option value={7}>7</option>
+                <option value={14}>14</option>
+                <option value={30}>30</option>
+              </select>
+            </label>
+            <UiButton
+              onClick={() => void loadVariantSalesAnalytics()}
+              disabled={whAnalyticsLoading || !whActiveShop?.hasApiKey}
+            >
+              {whAnalyticsLoading ? 'Đang phân tích…' : 'Phân tích từ webhook'}
+            </UiButton>
+          </div>
+        </div>
+        <p className="muted small">
+          Dựa trên webhook <code>orders</code> (mã trong{' '}
+          <code>items[].variation_info</code>) và tồn từ Open API. Mã SP ={' '}
+          <code>product_display_id</code>, mã biến thể = <code>display_id</code>.
+        </p>
+        {whAnalyticsError && (
+          <p className="hint hint-error">{whAnalyticsError}</p>
+        )}
+        {whAnalytics && (
+          <>
+            <p className="muted small">
+              Kỳ {whAnalytics.windowDays} ngày · đơn webhook:{' '}
+              <strong>{whAnalytics.orderEventsUsed}</strong> · tồn webhook:{' '}
+              <strong>{whAnalytics.stockEventsUsed}</strong>
+              {whAnalytics.variants.length > 0 && (
+                <>
+                  {' '}
+                  · <strong>{whAnalyticsDisplayRows.length}</strong> /{' '}
+                  {whAnalytics.variants.length} dòng hiển thị
+                </>
+              )}
+            </p>
+            {whAnalytics.variants.length > 0 && (
+              <div className="search-row webhook-analytics-filters">
+                <label
+                  className="search-label"
+                  htmlFor="wh-analytics-search"
+                >
+                  Lọc mã
+                </label>
+                <div className="search-input-wrap">
+                  <input
+                    id="wh-analytics-search"
+                    type="search"
+                    className="search-input"
+                    placeholder="Mã SP hoặc mã biến thể, ví dụ T2071, 8917XANHCOM…"
+                    value={whAnalyticsSearch}
+                    onChange={(e) => setWhAnalyticsSearch(e.target.value)}
+                    autoComplete="off"
+                  />
+                  {whAnalyticsSearch.trim() !== '' && (
+                    <button
+                      type="button"
+                      className="search-clear"
+                      onClick={() => setWhAnalyticsSearch('')}
+                      aria-label="Xóa bộ lọc"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {whAnalytics.variants.length === 0 ? (
+              <p className="muted">
+                Chưa có dòng bán nào trong kỳ. Kiểm tra webhook{' '}
+                <code>orders</code> và payload có <code>items</code> với{' '}
+                <code>variation_info.product_display_id</code> /{' '}
+                <code>variation_info.display_id</code>.
+              </p>
+            ) : whAnalyticsDisplayRows.length === 0 ? (
+              <p className="muted">
+                Không có dòng nào khớp “{whAnalyticsSearch.trim()}”.{' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setWhAnalyticsSearch('')}
+                >
+                  Xóa bộ lọc
+                </button>
+              </p>
+            ) : (
+              <UiDataTable
+                rows={whAnalyticsDisplayRows}
+                columns={whAnalyticsColumns}
+                sort={{
+                  key: whAnalyticsSortKey,
+                  dir: whAnalyticsSortDir,
+                }}
+                onSortChange={handleAnalyticsSortChange}
+                rowKey={(row) =>
+                  row.variantCode || row.productCode || `row-${row.hotRank}`
+                }
+                wrapClassName="webhook-openapi-wrap"
+                tableClassName="data-table--openapi"
+              />
+            )}
+            <p className="muted small">{whAnalytics.note}</p>
+          </>
+        )}
       </section>
 
       <section className="card" aria-labelledby="wh-events-title">

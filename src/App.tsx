@@ -6,6 +6,7 @@ import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { TOOLS } from './config/tools';
+import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
 import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
 import { SalaryPanel } from './features/salary/SalaryPanel';
@@ -94,8 +95,16 @@ export default function App() {
       </AppBar>
 
       <div className="layout">
-        {activeToolId === 'pancake-einvoice' && (
-          <PancakeEinvoicePanel toolDescription={activeTool.description} />
+        {INVOICE_SHOPS.map((shop) =>
+          activeToolId === shop.toolId ? (
+            <PancakeEinvoicePanel
+              key={shop.toolId}
+              shopKey={shop.shopKey}
+              shopLabel={shop.label}
+              defaultPancakeShopId={shop.defaultPancakeShopId}
+              toolDescription={activeTool.description}
+            />
+          ) : null
         )}
 
         {activeToolId === 'pancake-webhook' && (

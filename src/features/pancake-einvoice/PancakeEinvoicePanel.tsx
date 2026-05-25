@@ -6,6 +6,8 @@ import {
   type ChangeEvent,
 } from 'react';
 import TablePagination from '@mui/material/TablePagination';
+import type { InvoiceShopKey } from '../../config/invoiceShops';
+import { invoiceApiBase } from '../../config/invoiceShops';
 import type { CustomerModalState, InvoiceRow } from '../../types';
 import { apiUrl } from '../../lib/api';
 import {
@@ -28,10 +30,18 @@ const DATA_TABLE_DEFAULT_PAGE_SIZE = 20;
 const DATA_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export function PancakeEinvoicePanel({
+  shopKey,
+  shopLabel,
+  defaultPancakeShopId,
   toolDescription,
 }: {
+  shopKey: InvoiceShopKey;
+  shopLabel: string;
+  defaultPancakeShopId: string;
   toolDescription: string;
 }) {
+  const apiBase = invoiceApiBase(shopKey);
+  const pancakeEinvoiceUrl = `https://pos.pancake.vn/shop/${defaultPancakeShopId}/e-invoices`;
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState('');
@@ -53,6 +63,11 @@ export function PancakeEinvoicePanel({
   const [crudMessage, setCrudMessage] = useState('');
   const [e2eStatus, setE2eStatus] = useState('sẵn sàng');
   const [e2eMessage, setE2eMessage] = useState('');
+  const [meitDailyConfigured, setMeitDailyConfigured] = useState(
+    shopKey !== 'meit'
+  );
+  const [meitModeInvoiceUrl, setMeitModeInvoiceUrl] = useState(pancakeEinvoiceUrl);
+  const [meitDailyInvoiceUrl, setMeitDailyInvoiceUrl] = useState('');
 
   const searchNorm = useMemo(
     () => dataSearch.trim().toLocaleLowerCase('vi-VN'),
@@ -127,7 +142,7 @@ export function PancakeEinvoicePanel({
     setDataLoading(true);
     setDataError('');
     try {
-      const res = await fetch(apiUrl('/invoice-data'));
+      const res = await fetch(apiUrl(`${apiBase}/invoice-data`));
       const data = (await res.json().catch(() => ({}))) as {
         rows?: unknown;
         error?: string;
@@ -148,18 +163,48 @@ export function PancakeEinvoicePanel({
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  }, [apiBase]);
 
   useEffect(() => {
     void loadInvoiceData();
   }, [loadInvoiceData]);
+
+  useEffect(() => {
+    if (shopKey !== 'meit') return;
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl(`${apiBase}/config`));
+        const data = (await res.json().catch(() => ({}))) as {
+          meitAutomationTargets?: Array<{
+            variant: string;
+            label: string;
+            invoiceUrl: string;
+            configured?: boolean;
+          }>;
+        };
+        if (!res.ok) return;
+        const targets = data.meitAutomationTargets ?? [];
+        const mode = targets.find((t) => t.variant === 'mode');
+        const daily = targets.find((t) => t.variant === 'daily');
+        if (mode?.invoiceUrl) {
+          setMeitModeInvoiceUrl(mode.invoiceUrl);
+        }
+        if (daily?.invoiceUrl) {
+          setMeitDailyInvoiceUrl(daily.invoiceUrl);
+        }
+        setMeitDailyConfigured(Boolean(daily?.configured));
+      } catch {
+        /* keep defaults */
+      }
+    })();
+  }, [apiBase, shopKey]);
 
   const persistInvoiceRows = useCallback(
     async (nextRows: InvoiceRow[]) => {
       setCrudSaving(true);
       setCrudError('');
       try {
-        const res = await fetch(apiUrl('/invoice-data'), {
+        const res = await fetch(apiUrl(`${apiBase}/invoice-data`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows: nextRows }),
@@ -244,14 +289,28 @@ export function PancakeEinvoicePanel({
     void persistInvoiceRows(nextRows);
   };
 
-  const runE2eTests = async () => {
+  const runE2eTests = async (meitVariant?: 'mode' | 'daily') => {
+    const runLabel =
+      shopKey === 'meit'
+        ? meitVariant === 'daily'
+          ? 'MeiT Daily'
+          : 'MeiT Mode'
+        : shopLabel;
     setE2eStatus('đang chạy');
     setE2eMessage('');
     try {
-      const res = await fetch(apiUrl('/run-e2e-tests'), {
+      const res = await fetch(apiUrl(`${apiBase}/run-e2e-tests`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spec: UI_WDIO_SINGLE_SPEC }),
+        body: JSON.stringify({
+          spec: UI_WDIO_SINGLE_SPEC,
+          shop: shopKey,
+          ...(shopKey === 'meit' && meitVariant
+            ? { meitVariant }
+            : shopKey === 'meit'
+              ? { meitVariant: 'mode' }
+              : {}),
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.status === 409) {
@@ -264,7 +323,7 @@ export function PancakeEinvoicePanel({
       }
       setE2eStatus('sẵn sàng');
       setE2eMessage(
-        'Đã chạy xong một bộ kiểm thử (hóa đơn điện tử). Xem log trên terminal server.'
+        `Đã chạy xong (${runLabel}). Xem log trên terminal server.`
       );
     } catch (err) {
       console.error(err);
@@ -288,7 +347,7 @@ export function PancakeEinvoicePanel({
     body.append('file', file);
 
     try {
-      const res = await fetch(apiUrl('/upload-invoice-excel'), {
+      const res = await fetch(apiUrl(`${apiBase}/upload-invoice-excel`), {
         method: 'POST',
         body,
       });
@@ -317,28 +376,74 @@ export function PancakeEinvoicePanel({
     <>
       <p className="tool-intro muted">
         {toolDescription}{' '}
-        <a
-          href="https://pos.pancake.vn/shop/1942925579/e-invoices"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Mở e-invoices trên Pancake
-        </a>
+        {shopKey === 'meit' ? (
+          <>
+            <a href={meitModeInvoiceUrl} target="_blank" rel="noreferrer">
+              MeiT Mode
+            </a>
+            {meitDailyInvoiceUrl ? (
+              <>
+                {' '}
+                ·{' '}
+                <a href={meitDailyInvoiceUrl} target="_blank" rel="noreferrer">
+                  MeiT Daily
+                </a>
+              </>
+            ) : null}
+          </>
+        ) : (
+          <a href={pancakeEinvoiceUrl} target="_blank" rel="noreferrer">
+            Mở e-invoices {shopLabel} trên Pancake
+          </a>
+        )}
         .
       </p>
 
       <section className="card" aria-labelledby="pancake-run-title">
         <h2 id="pancake-run-title" className="section-title">
-          Tự động phát hành hóa đơn trên Pancake
+          Tự động phát hành hóa đơn ({shopLabel})
         </h2>
         <div className="run-automation-actions">
-          <UiButton
-            onClick={() => void runE2eTests()}
-            disabled={e2eStatus === 'đang chạy'}
-          >
-            {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Bắt đầu'}
-          </UiButton>
+          {shopKey === 'meit' ? (
+            <>
+              <UiButton
+                onClick={() => void runE2eTests('mode')}
+                disabled={e2eStatus === 'đang chạy'}
+              >
+                {e2eStatus === 'đang chạy'
+                  ? 'Đang chạy…'
+                  : 'Bắt đầu · MeiT Mode'}
+              </UiButton>
+              <UiButton
+                onClick={() => void runE2eTests('daily')}
+                disabled={e2eStatus === 'đang chạy' || !meitDailyConfigured}
+                title={
+                  meitDailyConfigured
+                    ? undefined
+                    : 'Cần PANCAKE_MEIT_DAILY_SHOP_ID trên server'
+                }
+              >
+                {e2eStatus === 'đang chạy'
+                  ? 'Đang chạy…'
+                  : 'Bắt đầu · MeiT Daily'}
+              </UiButton>
+            </>
+          ) : (
+            <UiButton
+              onClick={() => void runE2eTests()}
+              disabled={e2eStatus === 'đang chạy'}
+            >
+              {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Bắt đầu'}
+            </UiButton>
+          )}
         </div>
+        {shopKey === 'meit' && !meitDailyConfigured && (
+          <p className="muted small">
+            MeiT Daily: đặt <code>PANCAKE_MEIT_DAILY_SHOP_ID</code> và{' '}
+            <code>PANCAKE_MEIT_DAILY_API_KEY</code> trên server để bật nút thứ
+            hai.
+          </p>
+        )}
         <p className="status status-e2e">
           Trạng thái: <strong>{e2eStatus}</strong>
         </p>
@@ -356,7 +461,8 @@ export function PancakeEinvoicePanel({
             phép kinh doanh, Tên đơn vị
           </strong>
           . Sheet đầu tiên được dùng. Mỗi lần tải sẽ{' '}
-          <strong>thay thế</strong> toàn bộ dữ liệu khách hàng trên server.
+          <strong>thay thế</strong> toàn bộ dữ liệu khách hàng của{' '}
+          <strong>{shopLabel}</strong> trên server (Mongo collection riêng).
         </p>
         <div className="excel-upload-toolbar">
           <label className="file-label excel-file-label">
@@ -374,7 +480,7 @@ export function PancakeEinvoicePanel({
           </label>
           <a
             className="btn-secondary excel-template-link"
-            href={apiUrl('/invoice-excel-template')}
+            href={apiUrl(`${apiBase}/invoice-excel-template`)}
             download="mau-khach-hang-hoa-don-dien-tu.xlsx"
           >
             Tải file Excel mẫu
@@ -397,7 +503,7 @@ export function PancakeEinvoicePanel({
       >
         <div className="table-head">
           <h2 id="pancake-data-title" className="section-title">
-            Dữ liệu hiện tại
+            Dữ liệu khách — {shopLabel}
           </h2>
           {!dataLoading && !dataError && (
             <div className="table-head-actions">

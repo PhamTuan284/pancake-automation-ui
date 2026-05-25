@@ -21,11 +21,20 @@ export type ToolDef = {
   disabled?: boolean;
 };
 
+export type PancakeWebhookShopConfig = {
+  shopKey: 'meit' | 'dpa';
+  label: string;
+  shopId: string;
+  hasApiKey: boolean;
+};
+
 /** GET /pancake-webhook/config */
 export type PancakeWebhookConfig = {
   receiverPath: string;
   publicBaseUrl: string | null;
   fullReceiverUrl: string | null;
+  shops: PancakeWebhookShopConfig[];
+  /** MeiT shop (legacy fields). */
   shopId: string;
   hasApiKey: boolean;
   incomingSecretConfigured: boolean;
@@ -41,6 +50,33 @@ export type PancakeWebhookEventRow = {
   kind: string;
   contentType: string;
   payload: unknown;
+};
+
+/** GET /pancake-webhook/analytics/variant-sales */
+export type VariantSalesByDay = { date: string; quantity: number };
+
+export type VariantSalesRow = {
+  productCode: string;
+  variantCode: string;
+  soldInWindow: number;
+  avgSoldPerDay: number;
+  soldByDay: VariantSalesByDay[];
+  currentStock: number | null;
+  daysUntilSellOut: number | null;
+  hotRank: number;
+  lastSoldAt: string | null;
+  stockUpdatedAt: string | null;
+  stockSource: 'webhook' | 'catalog' | null;
+};
+
+export type VariantSalesAnalytics = {
+  windowDays: number;
+  from: string;
+  to: string;
+  orderEventsUsed: number;
+  stockEventsUsed: number;
+  variants: VariantSalesRow[];
+  note: string;
 };
 
 export type SalaryInputDraft = {

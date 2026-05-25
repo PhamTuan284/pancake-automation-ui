@@ -11,7 +11,7 @@ Mỗi công cụ trong ứng dụng có tài liệu **phạm vi, hành vi UI, AP
 
 | Tool ID | Tài liệu |
 |--------|----------|
-| `pancake-einvoice` | [FEATURE_PANCAKE_EINVOICE.md](./FEATURE_PANCAKE_EINVOICE.md) |
+| `pancake-einvoice-meit`, `pancake-einvoice-dpa` | [FEATURE_PANCAKE_EINVOICE.md](./FEATURE_PANCAKE_EINVOICE.md) |
 | `pancake-webhook` | [FEATURE_PANCAKE_WEBHOOK.md](./FEATURE_PANCAKE_WEBHOOK.md) |
 | `salary-calc` (Tính lương / HRM) | [FEATURE_TINH_LUONG.md](../FEATURE_TINH_LUONG.md) — **một file:** phần đang ship + phần roadmap |
 
