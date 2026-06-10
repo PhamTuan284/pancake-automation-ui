@@ -20,4 +20,10 @@ export const TOOLS: ToolDef[] = [
     description:
       'Tính lương nhân viên theo công, OT, phụ cấp, khấu trừ và thuế TNCN.',
   },
+  {
+    id: 'telegram-bot',
+    label: 'Telegram · Bot',
+    description:
+      'Gửi báo cáo biến thể bán chạy từ Pancake Webhook lên Telegram tự động mỗi ngày.',
+  },
 ];
