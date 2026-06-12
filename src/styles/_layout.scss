@@ -365,6 +365,34 @@ a.excel-template-link,
   color: t.$text-primary;
 }
 
+.save-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.save-mode-label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.save-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #e2e8f0;
+  cursor: pointer;
+
+  input[type='radio'] {
+    cursor: pointer;
+    accent-color: #6366f1;
+  }
+}
+
 .run-automation-actions {
   display: flex;
   flex-direction: column;

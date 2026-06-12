@@ -63,6 +63,7 @@ export function PancakeEinvoicePanel({
   const [crudMessage, setCrudMessage] = useState('');
   const [e2eStatus, setE2eStatus] = useState('sẵn sàng');
   const [e2eMessage, setE2eMessage] = useState('');
+  const [saveMode, setSaveMode] = useState<'draft' | 'publish'>('draft');
   const [meitDailyConfigured, setMeitDailyConfigured] = useState(
     shopKey !== 'meit'
   );
@@ -305,6 +306,7 @@ export function PancakeEinvoicePanel({
         body: JSON.stringify({
           spec: UI_WDIO_SINGLE_SPEC,
           shop: shopKey,
+          saveMode,
           ...(shopKey === 'meit' && meitVariant
             ? { meitVariant }
             : shopKey === 'meit'
@@ -403,6 +405,29 @@ export function PancakeEinvoicePanel({
         <h2 id="pancake-run-title" className="section-title">
           Tự động phát hành hóa đơn ({shopLabel})
         </h2>
+        <div className="save-mode-row">
+          <span className="save-mode-label">Sau khi điền xong:</span>
+          <label className="save-mode-option">
+            <input
+              type="radio"
+              name={`save-mode-${shopKey}`}
+              value="draft"
+              checked={saveMode === 'draft'}
+              onChange={() => setSaveMode('draft')}
+            />
+            {' '}Lưu (nháp)
+          </label>
+          <label className="save-mode-option">
+            <input
+              type="radio"
+              name={`save-mode-${shopKey}`}
+              value="publish"
+              checked={saveMode === 'publish'}
+              onChange={() => setSaveMode('publish')}
+            />
+            {' '}Lưu và phát hành
+          </label>
+        </div>
         <div className="run-automation-actions">
           {shopKey === 'meit' ? (
             <>
