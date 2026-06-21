@@ -290,6 +290,18 @@ export function PancakeEinvoicePanel({
     void persistInvoiceRows(nextRows);
   };
 
+  const resetAutomationFlag = async () => {
+    try {
+      await fetch(apiUrl('/pancake-einvoice/reset-automation-flag'), {
+        method: 'POST',
+      });
+      setE2eStatus('sẵn sàng');
+      setE2eMessage('Đã reset trạng thái. Kiểm tra server để đảm bảo không còn tiến trình nào đang chạy.');
+    } catch {
+      setE2eMessage('Không gọi được API reset.');
+    }
+  };
+
   const runE2eTests = async (meitVariant?: 'mode' | 'daily') => {
     const runLabel =
       shopKey === 'meit'
@@ -471,6 +483,17 @@ export function PancakeEinvoicePanel({
         )}
         <p className="status status-e2e">
           Trạng thái: <strong>{e2eStatus}</strong>
+          {e2eStatus === 'đang chạy' && (
+            <UiButton
+              variant="secondary"
+              tone="danger"
+              onClick={() => void resetAutomationFlag()}
+              title="Dùng khi tiến trình bị kẹt và không tự dừng được"
+              style={{ marginLeft: '12px', fontSize: '12px', padding: '2px 8px' }}
+            >
+              Force reset
+            </UiButton>
+          )}
         </p>
         {e2eMessage && <p className="hint">{e2eMessage}</p>}
       </section>
