@@ -11,6 +11,7 @@ import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoic
 import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
 import { SalaryPanel } from './features/salary/SalaryPanel';
 import { TelegramBotPanel } from './features/telegram-bot/TelegramBotPanel';
+import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 
 const TOOL_QUERY_PARAM = 'tool';
 const DEFAULT_TOOL_ID =
@@ -118,6 +119,10 @@ export default function App() {
 
         {activeToolId === 'telegram-bot' && (
           <TelegramBotPanel toolDescription={activeTool.description} />
+        )}
+
+        {activeToolId === 'zalo-bot' && (
+          <ZaloBotPanel toolDescription={activeTool.description} />
         )}
       </div>
     </div>

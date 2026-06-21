@@ -26,4 +26,10 @@ export const TOOLS: ToolDef[] = [
     description:
       'Gửi báo cáo biến thể bán chạy từ Pancake Webhook lên Telegram tự động mỗi ngày.',
   },
+  {
+    id: 'zalo-bot',
+    label: 'Zalo · Bot',
+    description:
+      'Gửi báo cáo biến thể bán chạy từ Pancake Webhook vào nhóm Zalo tự động mỗi ngày.',
+  },
 ];
