@@ -1,0 +1,260 @@
+import { useCallback, useEffect, useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import { apiUrl } from '../../lib/api';
+import type { AuthUser } from '../../context/AuthContext';
+
+type UserRow = {
+  _id: string;
+  username: string;
+  role: 'admin' | 'user';
+  isActive: boolean;
+  createdAt: string;
+};
+
+type Props = {
+  token: AuthUser['token'];
+  currentUsername: string;
+};
+
+type FormState = {
+  username: string;
+  password: string;
+  role: 'admin' | 'user';
+};
+
+const EMPTY_FORM: FormState = { username: '', password: '', role: 'user' };
+
+export function UserManagement({ token, currentUsername }: Props) {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<UserRow | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const authHeader = { Authorization: `Bearer ${token}` };
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(apiUrl('/admin/users'), { headers: authHeader });
+      if (!res.ok) throw new Error('Không thể tải danh sách người dùng.');
+      setUsers(await res.json() as UserRow[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi không xác định.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { void fetchUsers(); }, [fetchUsers]);
+
+  function openCreate() {
+    setEditTarget(null);
+    setForm(EMPTY_FORM);
+    setFormError(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(user: UserRow) {
+    setEditTarget(user);
+    setForm({ username: user.username, password: '', role: user.role });
+    setFormError(null);
+    setDialogOpen(true);
+  }
+
+  async function handleSubmit() {
+    if (!form.username.trim()) {
+      setFormError('Tên đăng nhập không được để trống.');
+      return;
+    }
+    if (!editTarget && !form.password) {
+      setFormError('Mật khẩu không được để trống.');
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      if (editTarget) {
+        const body: Record<string, unknown> = { role: form.role };
+        if (form.password) body.password = form.password;
+        const res = await fetch(apiUrl(`/admin/users/${editTarget._id}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...authHeader },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error ?? 'Cập nhật thất bại.');
+      } else {
+        const res = await fetch(apiUrl('/admin/users'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader },
+          body: JSON.stringify(form),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(data.error ?? 'Tạo người dùng thất bại.');
+      }
+      setDialogOpen(false);
+      await fetchUsers();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Lỗi không xác định.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(user: UserRow) {
+    if (!window.confirm(`Xóa người dùng "${user.username}"?`)) return;
+    try {
+      const res = await fetch(apiUrl(`/admin/users/${user._id}`), {
+        method: 'DELETE',
+        headers: authHeader,
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Xóa thất bại.');
+      await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi không xác định.');
+    }
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">Quản lý người dùng</Typography>
+        <Button variant="contained" startIcon={<PersonAddIcon />} onClick={openCreate}>
+          Thêm người dùng
+        </Button>
+      </Box>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Tên đăng nhập</TableCell>
+              <TableCell>Vai trò</TableCell>
+              <TableCell>Trạng thái</TableCell>
+              <TableCell>Ngày tạo</TableCell>
+              <TableCell align="right">Thao tác</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map((u) => (
+              <TableRow key={u._id}>
+                <TableCell>{u.username}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={u.role === 'admin' ? 'Admin' : 'User'}
+                    color={u.role === 'admin' ? 'primary' : 'default'}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    label={u.isActive ? 'Hoạt động' : 'Bị khóa'}
+                    color={u.isActive ? 'success' : 'error'}
+                    size="small"
+                    variant="outlined"
+                  />
+                </TableCell>
+                <TableCell>
+                  {new Date(u.createdAt).toLocaleDateString('vi-VN')}
+                </TableCell>
+                <TableCell align="right">
+                  <IconButton size="small" onClick={() => openEdit(u)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={u.username === currentUsername}
+                    onClick={() => handleDelete(u)}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{editTarget ? 'Sửa người dùng' : 'Thêm người dùng'}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          <TextField
+            label="Tên đăng nhập"
+            value={form.username}
+            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+            disabled={!!editTarget}
+            fullWidth
+            size="small"
+          />
+          <TextField
+            label={editTarget ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu'}
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            fullWidth
+            size="small"
+          />
+          <FormControl size="small" fullWidth>
+            <InputLabel>Vai trò</InputLabel>
+            <Select
+              label="Vai trò"
+              value={form.role}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as 'admin' | 'user' }))}
+            >
+              <MenuItem value="user">User</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+            </Select>
+          </FormControl>
+          {formError && <Alert severity="error">{formError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Hủy</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={16} /> : undefined}
+          >
+            {editTarget ? 'Lưu' : 'Tạo'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

@@ -32,4 +32,9 @@ export const TOOLS: ToolDef[] = [
     description:
       'Gửi báo cáo biến thể bán chạy từ Pancake Webhook vào nhóm Zalo tự động mỗi ngày.',
   },
+  {
+    id: 'admin',
+    label: 'Admin',
+    description: 'Cài đặt hệ thống: quản lý tab, bot và người dùng.',
+  },
 ];
