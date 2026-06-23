@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   PancakeWebhookConfig,
   PancakeWebhookEventRow,
@@ -7,16 +7,116 @@ import type {
   VariantSalesRow,
 } from '../../types';
 import { apiUrl } from '../../lib/api';
-import {
-  apiCellText,
-  apiTableColumns,
-  extractApiRows,
-} from '../../lib/apiResponse';
+import { extractApiRows } from '../../lib/apiResponse';
 import {
   UiButton,
   UiDataTable,
   type UiDataTableColumn,
 } from '../../components/ui';
+
+function nestedProduct(row: Record<string, unknown>): Record<string, unknown> | null {
+  const p = row.product;
+  return p && typeof p === 'object' && !Array.isArray(p)
+    ? (p as Record<string, unknown>)
+    : null;
+}
+
+function extractUrlFromImages(images: unknown): string | null {
+  if (!Array.isArray(images) || images.length === 0) return null;
+  const first = images[0];
+  if (typeof first === 'string' && first.trim()) return first.trim();
+  if (first && typeof first === 'object') {
+    const img = first as Record<string, unknown>;
+    const url = img.thumbnail_url ?? img.url ?? img.src;
+    if (typeof url === 'string' && url.trim()) return url.trim();
+  }
+  return null;
+}
+
+function getProductImageUrl(row: Record<string, unknown>): string | null {
+  const direct = extractUrlFromImages(row.images);
+  if (direct) return direct;
+  const prod = nestedProduct(row);
+  if (prod) {
+    const fromProd = extractUrlFromImages(prod.images);
+    if (fromProd) return fromProd;
+    for (const field of ['thumbnail_url', 'image_url', 'photo_url', 'image']) {
+      const v = prod[field];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+  }
+  for (const field of ['thumbnail_url', 'image_url', 'photo_url']) {
+    const v = row[field];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function getProductName(row: Record<string, unknown>): string {
+  const prod = nestedProduct(row);
+  return (
+    String(row.product_name ?? prod?.name ?? row.name ?? '').trim() || '—'
+  );
+}
+
+function getVariantName(row: Record<string, unknown>): string {
+  return String(row.name ?? row.variant_name ?? '').trim();
+}
+
+function getProductCode(row: Record<string, unknown>): string {
+  const prod = nestedProduct(row);
+  return String(
+    row.product_display_id ?? prod?.display_id ?? row.product_sku ?? ''
+  ).trim();
+}
+
+function getVariantLabel(row: Record<string, unknown>, productCode: string): string {
+  const name = getVariantName(row);
+  if (name) return name;
+  const displayId = String(row.display_id ?? '').trim();
+  if (productCode && displayId.toUpperCase().startsWith(productCode.toUpperCase())) {
+    const suffix = displayId.slice(productCode.length);
+    if (suffix) return suffix;
+  }
+  return displayId || '—';
+}
+
+function stockClass(stock: number | null): string {
+  if (stock === null) return 'product-stock--unknown';
+  if (stock === 0) return 'product-stock--empty';
+  if (stock <= 5) return 'product-stock--low';
+  return 'product-stock--ok';
+}
+
+function formatVndPrice(value: unknown): string {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return '—';
+  return n.toLocaleString('vi-VN') + ' ₫';
+}
+
+function getProductPrice(row: Record<string, unknown>): string {
+  if (row.price !== undefined && row.price !== null) return formatVndPrice(row.price);
+  const prod = nestedProduct(row);
+  if (prod?.price !== undefined && prod?.price !== null) return formatVndPrice(prod.price);
+  return '—';
+}
+
+function getProductStock(row: Record<string, unknown>): number | null {
+  for (const field of ['quantity', 'remain_quantity', 'stock_quantity']) {
+    const v = row[field];
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+function productStatusInfo(row: Record<string, unknown>): { label: string; cls: string } {
+  const s = String(row.status ?? '').toLowerCase().trim();
+  if (s === 'active' || s === '1') return { label: 'Đang bán', cls: 'product-status--active' };
+  if (s === 'inactive' || s === '0') return { label: 'Ngừng bán', cls: 'product-status--inactive' };
+  if (!s || s === 'null') return { label: '', cls: '' };
+  return { label: s, cls: 'product-status--unknown' };
+}
 
 const DEFAULT_WEBHOOK_TYPES = [
   'orders',
@@ -116,7 +216,10 @@ export function PancakeWebhookPanel({
   const [whProductsLoading, setWhProductsLoading] = useState(false);
   const [whProductsError, setWhProductsError] = useState('');
   const [whProductsData, setWhProductsData] = useState<unknown>(null);
+  const [whProductsSearch, setWhProductsSearch] = useState('');
   const [whPingBusy, setWhPingBusy] = useState(false);
+  const [whZaloSending, setWhZaloSending] = useState<string | null>(null);
+  const [whZaloResults, setWhZaloResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
   const [whAnalyticsDays, setWhAnalyticsDays] = useState(7);
   const [whAnalyticsLoading, setWhAnalyticsLoading] = useState(false);
   const [whAnalyticsError, setWhAnalyticsError] = useState('');
@@ -142,23 +245,6 @@ export function PancakeWebhookPanel({
   const whProductRows = useMemo(
     () => extractApiRows(whProductsData),
     [whProductsData]
-  );
-  const whProductCols = useMemo(
-    () =>
-      apiTableColumns(whProductRows, [
-        'variation_id',
-        'id',
-        'sku',
-        'product_sku',
-        'name',
-        'product_name',
-        'barcode',
-        'price',
-        'quantity',
-        'status',
-        'updated_at',
-      ]),
-    [whProductRows]
   );
   const formatQty = (n: number | null | undefined) =>
     n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('vi-VN');
@@ -273,12 +359,33 @@ export function PancakeWebhookPanel({
     []
   );
 
-  const whProductTableColumns: UiDataTableColumn<(typeof whProductRows)[number]>[] =
-    whProductCols.map((col) => ({
-      key: col,
-      header: col,
-      render: (row) => apiCellText(row[col]),
-    }));
+  const whProductsFiltered = useMemo(() => {
+    const inStock = whProductRows.filter((row) => {
+      const stock = getProductStock(row);
+      return stock === null || stock > 0;
+    });
+    if (!whProductsSearch.trim()) return inStock;
+    const q = whProductsSearch.trim().toLowerCase();
+    return inStock.filter((row) => {
+      const prod = nestedProduct(row);
+      const haystack = [
+        row.product_name, prod?.name, row.name, row.display_id, row.sku, row.product_sku, row.barcode,
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [whProductRows, whProductsSearch]);
+
+  const whProductsGrouped = useMemo(() => {
+    const groups = new Map<string, { productCode: string; rows: typeof whProductsFiltered }>();
+    for (const row of whProductsFiltered) {
+      const productCode = getProductCode(row);
+      const key = productCode || String(row.variation_id ?? row.id ?? row.display_id ?? Math.random());
+      if (!groups.has(key)) groups.set(key, { productCode, rows: [] });
+      groups.get(key)!.rows.push(row);
+    }
+    return [...groups.values()];
+  }, [whProductsFiltered]);
+
   const whEventsGrouped = useMemo(() => {
     const map = new Map<string, PancakeWebhookEventRow[]>();
     for (const ev of whEvents) {
@@ -388,6 +495,7 @@ export function PancakeWebhookPanel({
         throw new Error(data.error || 'Không tải được danh sách sản phẩm');
       }
       setWhProductsData(data.data ?? null);
+      setWhProductsSearch('');
     } catch (err) {
       console.error(err);
       setWhProductsData(null);
@@ -468,6 +576,44 @@ export function PancakeWebhookPanel({
       setWhError(
         err instanceof Error ? err.message : 'Không xóa được sự kiện.'
       );
+    }
+  };
+
+  const sendProductStockToZalo = async (
+    productCode: string,
+    productName: string,
+    imageUrl: string | null,
+    price: string,
+    variants: Array<{ label: string; displayId: string; stock: number | null }>
+  ) => {
+    setWhZaloSending(productCode);
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/send-product-stock'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productCode, productName, imageUrl, price, variants }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      setWhZaloResults((prev) => ({
+        ...prev,
+        [productCode]: { ok: !!data.ok, error: data.error },
+      }));
+      if (data.ok) {
+        setTimeout(() => {
+          setWhZaloResults((prev) => {
+            const next = { ...prev };
+            delete next[productCode];
+            return next;
+          });
+        }, 4000);
+      }
+    } catch (err) {
+      setWhZaloResults((prev) => ({
+        ...prev,
+        [productCode]: { ok: false, error: err instanceof Error ? err.message : 'Lỗi gửi' },
+      }));
+    } finally {
+      setWhZaloSending(null);
     }
   };
 
@@ -683,26 +829,166 @@ export function PancakeWebhookPanel({
         {whProductsError && (
           <p className="hint hint-error">{whProductsError}</p>
         )}
-        {whProductsData !== null &&
-          !whProductsError &&
-          whProductRows.length > 0 && (
-            <UiDataTable
-              rows={whProductRows}
-              columns={whProductTableColumns}
-              rowKey={(row, i) =>
-                String(row.variation_id ?? row.id ?? row.sku ?? `prd-${i}`)
-              }
-              wrapClassName="webhook-openapi-wrap"
-              tableClassName="data-table--openapi"
-            />
-          )}
-        {whProductsData !== null &&
-          !whProductsError &&
-          whProductRows.length === 0 && (
-            <pre className="webhook-payload">
-              {JSON.stringify(whProductsData, null, 2)}
-            </pre>
-          )}
+        {whProductsData !== null && !whProductsError && whProductRows.length > 0 && (
+          <>
+            <div className="search-row">
+              <label className="search-label" htmlFor="wh-products-search">
+                Lọc sản phẩm
+              </label>
+              <div className="search-input-wrap">
+                <input
+                  id="wh-products-search"
+                  type="search"
+                  className="search-input"
+                  placeholder="Tên sản phẩm, mã SKU, mã biến thể, barcode…"
+                  value={whProductsSearch}
+                  onChange={(e) => setWhProductsSearch(e.target.value)}
+                  autoComplete="off"
+                />
+                {whProductsSearch.trim() !== '' && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    onClick={() => setWhProductsSearch('')}
+                    aria-label="Xóa bộ lọc"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="muted small">
+              <strong>{whProductsGrouped.length}</strong> sản phẩm ·{' '}
+              <strong>{whProductsFiltered.length}</strong> biến thể còn hàng
+              {whProductsFiltered.length < whProductRows.length && (
+                <> (tổng {whProductRows.length} biến thể)</>
+              )}
+            </p>
+            {whProductsFiltered.length === 0 ? (
+              <p className="muted">
+                Không tìm thấy biến thể nào khớp "{whProductsSearch.trim()}".{' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setWhProductsSearch('')}
+                >
+                  Xóa bộ lọc
+                </button>
+              </p>
+            ) : (
+              <div className="product-group-list">
+                {whProductsGrouped.map(({ productCode, rows }) => {
+                  const firstRow = rows[0];
+                  const imgUrl = getProductImageUrl(firstRow);
+                  const productName = getProductName(firstRow);
+                  const price = getProductPrice(firstRow);
+                  const placeholderLetter = (
+                    productName !== '—' ? productName[0] : (productCode[0] ?? '?')
+                  ).toUpperCase();
+                  return (
+                    <div key={productCode || productName} className="product-group">
+                      <div className="product-group-header">
+                        <div className="product-group-thumb">
+                          <div className="product-card-img-placeholder" aria-hidden>
+                            {placeholderLetter}
+                          </div>
+                          {imgUrl && (
+                            <img
+                              src={imgUrl}
+                              alt={productName}
+                              className="product-card-img"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                        <div className="product-group-info">
+                          <p className="product-group-name">{productName}</p>
+                          <div className="product-group-meta">
+                            {productCode && (
+                              <code className="product-code">{productCode}</code>
+                            )}
+                            {price !== '—' && (
+                              <span className="product-card-price">{price}</span>
+                            )}
+                            <span className="product-group-count">
+                              {rows.length} biến thể
+                            </span>
+                          </div>
+                          <div className="product-group-zalo">
+                            <UiButton
+                              variant="secondary"
+                              disabled={whZaloSending !== null}
+                              onClick={() =>
+                                void sendProductStockToZalo(
+                                  productCode,
+                                  productName,
+                                  imgUrl,
+                                  price,
+                                  rows.map((r) => ({
+                                    label: getVariantLabel(r, productCode),
+                                    displayId: String(r.display_id ?? ''),
+                                    stock: getProductStock(r),
+                                  }))
+                                )
+                              }
+                            >
+                              {whZaloSending === productCode ? 'Đang gửi…' : 'Gửi Zalo'}
+                            </UiButton>
+                            {whZaloResults[productCode] && (
+                              whZaloResults[productCode].ok
+                                ? <span className="zalo-send-ok">✓ Đã gửi</span>
+                                : <span className="zalo-send-error">{whZaloResults[productCode].error ?? 'Lỗi'}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="product-group-variants">
+                        {rows.map((row, vi) => {
+                          const displayId = String(row.display_id ?? '');
+                          const variantLabel = getVariantLabel(row, productCode);
+                          const stock = getProductStock(row);
+                          const status = productStatusInfo(row);
+                          const cls = stockClass(stock);
+                          return (
+                            <div
+                              key={displayId || vi}
+                              className="product-variant-row"
+                            >
+                              <span className="product-variant-label">
+                                {variantLabel}
+                              </span>
+                              {displayId && (
+                                <code className="product-code product-code--secondary">
+                                  {displayId}
+                                </code>
+                              )}
+                              <span className={`product-variant-stock ${cls}`}>
+                                Tồn:{' '}
+                                {stock === null
+                                  ? '—'
+                                  : stock.toLocaleString('vi-VN')}
+                              </span>
+                              {status.label && (
+                                <span className={`product-status ${status.cls}`}>
+                                  {status.label}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+        {whProductsData !== null && !whProductsError && whProductRows.length === 0 && (
+          <pre className="webhook-payload">
+            {JSON.stringify(whProductsData, null, 2)}
+          </pre>
+        )}
       </section>
 
       <section className="card" aria-labelledby="wh-analytics-title">

@@ -705,6 +705,301 @@ a.excel-template-link,
   color: #fca5a5;
 }
 
+.product-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.product-group {
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-md;
+  background: t.$bg-hover;
+  overflow: hidden;
+
+  &:hover {
+    border-color: t.$border-strong;
+  }
+}
+
+.product-group-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+}
+
+.product-group-thumb {
+  position: relative;
+  flex: 0 0 72px;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: t.$bg-page;
+  border: 1px solid t.$border-default;
+}
+
+.product-group-info {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.product-group-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: t.$text-primary;
+  line-height: 1.3;
+}
+
+.product-group-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.product-group-count {
+  font-size: 12px;
+  color: t.$text-muted;
+}
+
+.product-group-zalo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.zalo-send-ok {
+  font-size: 12px;
+  font-weight: 600;
+  color: t.$success;
+}
+
+.zalo-send-error {
+  font-size: 12px;
+  color: t.$error;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-group-variants {
+  border-top: 1px solid t.$border-default;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-variant-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px 8px calc(14px + 72px + 14px); // indent to align under product info
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  font-size: 13px;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &:hover {
+    background: rgba(30, 41, 59, 0.4);
+  }
+}
+
+.product-variant-label {
+  flex: 1 1 120px;
+  color: t.$text-secondary;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-variant-stock {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.product-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.product-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-md;
+  background: t.$bg-hover;
+  transition: border-color t.$trans-fast;
+
+  &:hover {
+    border-color: t.$border-strong;
+  }
+}
+
+.product-card-thumb {
+  position: relative;
+  flex: 0 0 68px;
+  width: 68px;
+  height: 68px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: t.$bg-page;
+  border: 1px solid t.$border-default;
+}
+
+.product-card-img-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: t.$text-muted;
+  user-select: none;
+}
+
+.product-card-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-card-body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.product-card-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: t.$text-primary;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-card-variant {
+  margin: 0;
+  font-size: 12px;
+  color: t.$text-secondary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-card-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.product-code {
+  display: inline-block;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.product-code--secondary {
+  color: t.$text-muted;
+  background: t.$bg-surface-soft;
+  border-color: t.$border-default;
+}
+
+.product-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.product-card-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: #34d399;
+}
+
+.product-card-stock {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.product-stock--ok {
+  color: t.$success;
+}
+
+.product-stock--low {
+  color: t.$warning;
+}
+
+.product-stock--empty {
+  color: t.$error;
+}
+
+.product-stock--unknown {
+  color: t.$text-muted;
+  font-weight: 400;
+}
+
+.product-status {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.product-status--active {
+  background: rgba(34, 197, 94, 0.12);
+  color: t.$success;
+}
+
+.product-status--inactive {
+  background: rgba(239, 68, 68, 0.1);
+  color: t.$error;
+}
+
+.product-status--unknown {
+  background: t.$bg-page;
+  color: t.$text-muted;
+}
+
+@media (max-width: 540px) {
+  .product-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 // Pancake Open API lists: default .data-table uses width:100% + max-width on td +
 // word-break:break-word, so many columns become ultra-narrow and UUIDs wrap per character.
 .webhook-openapi-wrap .data-table--openapi {
