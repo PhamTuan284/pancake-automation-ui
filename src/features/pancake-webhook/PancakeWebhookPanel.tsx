@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   PancakeWebhookConfig,
   PancakeWebhookEventRow,
@@ -220,6 +220,7 @@ export function PancakeWebhookPanel({
   const [whPingBusy, setWhPingBusy] = useState(false);
   const [whZaloSending, setWhZaloSending] = useState<string | null>(null);
   const [whZaloResults, setWhZaloResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
+  const productGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [whAnalyticsDays, setWhAnalyticsDays] = useState(7);
   const [whAnalyticsLoading, setWhAnalyticsLoading] = useState(false);
   const [whAnalyticsError, setWhAnalyticsError] = useState('');
@@ -580,29 +581,40 @@ export function PancakeWebhookPanel({
   };
 
   const sendProductStockToZalo = async (
-    productCode: string,
+    groupKey: string,
     productName: string,
-    imageUrl: string | null,
-    price: string,
-    variants: Array<{ label: string; displayId: string; stock: number | null }>
+    productCode: string
   ) => {
-    setWhZaloSending(productCode);
+    setWhZaloSending(groupKey);
     try {
+      const el = productGroupRefs.current.get(groupKey);
+      if (!el) throw new Error('Không tìm thấy phần tử card.');
+
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(el, {
+        useCORS: true,
+        allowTaint: false,
+        scale: 2,
+        backgroundColor: '#0f172a',
+        logging: false,
+      });
+      const imageBase64 = canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
+
       const res = await fetch(apiUrl('/zalo-bot/send-product-stock'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productCode, productName, imageUrl, price, variants }),
+        body: JSON.stringify({ imageBase64, productName, productCode }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       setWhZaloResults((prev) => ({
         ...prev,
-        [productCode]: { ok: !!data.ok, error: data.error },
+        [groupKey]: { ok: !!data.ok, error: data.error },
       }));
       if (data.ok) {
         setTimeout(() => {
           setWhZaloResults((prev) => {
             const next = { ...prev };
-            delete next[productCode];
+            delete next[groupKey];
             return next;
           });
         }, 4000);
@@ -610,7 +622,7 @@ export function PancakeWebhookPanel({
     } catch (err) {
       setWhZaloResults((prev) => ({
         ...prev,
-        [productCode]: { ok: false, error: err instanceof Error ? err.message : 'Lỗi gửi' },
+        [groupKey]: { ok: false, error: err instanceof Error ? err.message : 'Lỗi gửi' },
       }));
     } finally {
       setWhZaloSending(null);
@@ -885,8 +897,16 @@ export function PancakeWebhookPanel({
                   const placeholderLetter = (
                     productName !== '—' ? productName[0] : (productCode[0] ?? '?')
                   ).toUpperCase();
+                  const groupKey = productCode || productName;
                   return (
-                    <div key={productCode || productName} className="product-group">
+                    <div
+                      key={groupKey}
+                      className="product-group"
+                      ref={(el) => {
+                        if (el) productGroupRefs.current.set(groupKey, el);
+                        else productGroupRefs.current.delete(groupKey);
+                      }}
+                    >
                       <div className="product-group-header">
                         <div className="product-group-thumb">
                           <div className="product-card-img-placeholder" aria-hidden>
@@ -919,25 +939,15 @@ export function PancakeWebhookPanel({
                               variant="secondary"
                               disabled={whZaloSending !== null}
                               onClick={() =>
-                                void sendProductStockToZalo(
-                                  productCode,
-                                  productName,
-                                  imgUrl,
-                                  price,
-                                  rows.map((r) => ({
-                                    label: getVariantLabel(r, productCode),
-                                    displayId: String(r.display_id ?? ''),
-                                    stock: getProductStock(r),
-                                  }))
-                                )
+                                void sendProductStockToZalo(groupKey, productName, productCode)
                               }
                             >
-                              {whZaloSending === productCode ? 'Đang gửi…' : 'Gửi Zalo'}
+                              {whZaloSending === groupKey ? 'Đang gửi…' : 'Gửi Zalo'}
                             </UiButton>
-                            {whZaloResults[productCode] && (
-                              whZaloResults[productCode].ok
+                            {whZaloResults[groupKey] && (
+                              whZaloResults[groupKey].ok
                                 ? <span className="zalo-send-ok">✓ Đã gửi</span>
-                                : <span className="zalo-send-error">{whZaloResults[productCode].error ?? 'Lỗi'}</span>
+                                : <span className="zalo-send-error">{whZaloResults[groupKey].error ?? 'Lỗi'}</span>
                             )}
                           </div>
                         </div>

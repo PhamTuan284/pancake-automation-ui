@@ -6,6 +6,9 @@ const apiPort = process.env.PANCAKE_API_PORT || '4001';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['html2canvas'],
+  },
   server: {
     port: 5173,
     proxy: {
