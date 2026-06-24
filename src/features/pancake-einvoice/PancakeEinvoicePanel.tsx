@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react';
+import { ProductStockZaloSection } from '../pancake-webhook/ProductStockZaloSection';
 import TablePagination from '@mui/material/TablePagination';
 import type { InvoiceShopKey } from '../../config/invoiceShops';
 import { invoiceApiBase } from '../../config/invoiceShops';
@@ -729,6 +730,7 @@ export function PancakeEinvoicePanel({
           </div>
         </div>
       )}
+      <ProductStockZaloSection shopKey={shopKey} />
     </>
   );
 }
