@@ -705,6 +705,36 @@ a.excel-template-link,
   color: #fca5a5;
 }
 
+.raw-data-debug {
+  margin: 8px 0 12px;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 6px;
+  overflow: hidden;
+
+  summary {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #94a3b8);
+    background: var(--color-surface-2, #1e293b);
+    user-select: none;
+
+    &:hover { color: var(--color-text, #e2e8f0); }
+  }
+}
+
+.raw-data-pre {
+  margin: 0;
+  padding: 12px;
+  max-height: 400px;
+  overflow: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-text, #e2e8f0);
+  background: var(--color-surface-1, #0f172a);
+  white-space: pre;
+}
+
 .product-group-list {
   display: flex;
   flex-direction: column;

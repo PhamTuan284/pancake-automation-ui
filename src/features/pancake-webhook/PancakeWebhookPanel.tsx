@@ -196,25 +196,10 @@ function compareAnalyticsRows(
 
 // ── Stock image generator ────────────────────────────────────────────────────
 
-const SIZE_RE = /^(XS|S|M|L|XL|2XL|3XL|XXL|XXXL|\d{1,3})$/i;
-
-function splitColorSize(label: string): { color: string; size: string } {
-  const dashIdx = label.lastIndexOf(' - ');
-  if (dashIdx !== -1) {
-    const s = label.slice(dashIdx + 3).trim();
-    if (SIZE_RE.test(s)) return { color: label.slice(0, dashIdx).trim(), size: s.toUpperCase() };
-  }
-  const parts = label.trim().split(/\s+/);
-  if (parts.length >= 2 && SIZE_RE.test(parts[parts.length - 1])) {
-    return { color: parts.slice(0, -1).join(' '), size: parts[parts.length - 1].toUpperCase() };
-  }
-  return { color: '', size: label };
-}
-
 async function generateStockImage(
   displayCode: string,
   imageUrl: string | null,
-  variants: Array<{ label: string; stock: number | null }>
+  variants: Array<{ color: string; size: string; stock: number | null }>
 ): Promise<string> {
   const W = 800, H = 1000;
   const canvas = document.createElement('canvas');
@@ -252,10 +237,9 @@ async function generateStockImage(
   // Group variants by color
   const colorMap = new Map<string, { color: string; items: Array<{ size: string; stock: number | null }> }>();
   for (const v of variants) {
-    const { color, size } = splitColorSize(v.label);
-    const key = color || '__';
-    if (!colorMap.has(key)) colorMap.set(key, { color, items: [] });
-    colorMap.get(key)!.items.push({ size, stock: v.stock });
+    const key = v.color || '__';
+    if (!colorMap.has(key)) colorMap.set(key, { color: v.color, items: [] });
+    colorMap.get(key)!.items.push({ size: v.size, stock: v.stock });
   }
   const groups = [...colorMap.values()];
 
@@ -291,7 +275,7 @@ async function generateStockImage(
     const [ax, ay, alignRight, alignBottom] = corners[i];
 
     ctx.font = `bold ${STOCK_FONT}px sans-serif`;
-    const maxStockW = Math.max(...group.items.map(it => ctx.measureText(`${it.stock ?? '?'}${it.size}`).width));
+    const maxStockW = Math.max(...group.items.map(it => ctx.measureText(`${it.stock ?? '?'} ${it.size}`).width));
     ctx.font = `bold ${COLOR_FONT}px sans-serif`;
     const colorW = group.color ? ctx.measureText(group.color).width : 0;
     const boxW = Math.max(maxStockW, colorW) + PAD * 2;
@@ -323,7 +307,7 @@ async function generateStockImage(
     ctx.font = `bold ${STOCK_FONT}px sans-serif`;
     for (const it of group.items) {
       textY += LINE_H;
-      ctx.fillText(`${it.stock ?? '?'}${it.size}`, textX, textY);
+      ctx.fillText(`${it.stock ?? '?'} ${it.size}`, textX, textY);
     }
   });
 
@@ -382,6 +366,7 @@ export function PancakeWebhookPanel({
   const [whProductsError, setWhProductsError] = useState('');
   const [whProductsData, setWhProductsData] = useState<unknown>(null);
   const [whProductsSearch, setWhProductsSearch] = useState('');
+  const [whProductsDebug, setWhProductsDebug] = useState(false);
   const [whPingBusy, setWhPingBusy] = useState(false);
   const [whZaloSending, setWhZaloSending] = useState<string | null>(null);
   const [whZaloResults, setWhZaloResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
@@ -755,10 +740,22 @@ export function PancakeWebhookPanel({
       const firstRow = group.rows[0];
       const imgUrl = getProductImageUrl(firstRow);
       const displayCode = group.productCode || getProductName(firstRow);
-      const variants = group.rows.map((row) => ({
-        label: getVariantLabel(row, group.productCode),
-        stock: getProductStock(row),
-      }));
+      const variants = group.rows.map((row) => {
+        const fields = Array.isArray(row.fields)
+          ? (row.fields as Array<Record<string, unknown>>)
+          : [];
+        const colorField = fields.find(
+          (f) => typeof f.name === 'string' && /màu/i.test(f.name)
+        );
+        const sizeField = fields.find(
+          (f) => typeof f.name === 'string' && /size|kích/i.test(f.name)
+        );
+        const color = typeof colorField?.value === 'string' ? colorField.value : '';
+        const size = typeof sizeField?.value === 'string'
+          ? sizeField.value
+          : getVariantLabel(row, group.productCode);
+        return { color, size, stock: getProductStock(row) };
+      });
 
       const imageBase64 = await generateStockImage(displayCode, imgUrl, variants);
 
@@ -1030,7 +1027,21 @@ export function PancakeWebhookPanel({
               {whProductsFiltered.length < whProductRows.length && (
                 <> (tổng {whProductRows.length} biến thể)</>
               )}
+              {' · '}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setWhProductsDebug((v) => !v)}
+              >
+                {whProductsDebug ? 'Ẩn dữ liệu mẫu' : 'Xem dữ liệu mẫu'}
+              </button>
             </p>
+            {whProductsDebug && whProductRows.length > 0 && (
+              <details open className="raw-data-debug">
+                <summary>Biến thể đầu tiên — raw JSON từ Pancake</summary>
+                <pre className="raw-data-pre">{JSON.stringify(whProductRows[0], null, 2)}</pre>
+              </details>
+            )}
             {whProductsFiltered.length === 0 ? (
               <p className="muted">
                 Không tìm thấy biến thể nào khớp "{whProductsSearch.trim()}".{' '}
