@@ -370,6 +370,9 @@ export function PancakeWebhookPanel({
   const [whPingBusy, setWhPingBusy] = useState(false);
   const [whZaloSending, setWhZaloSending] = useState<string | null>(null);
   const [whZaloResults, setWhZaloResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
+  const [whZaloSelected, setWhZaloSelected] = useState<Set<string>>(new Set());
+  const [whBulkSending, setWhBulkSending] = useState(false);
+  const [whBulkProgress, setWhBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [whAnalyticsDays, setWhAnalyticsDays] = useState(7);
   const [whAnalyticsLoading, setWhAnalyticsLoading] = useState(false);
   const [whAnalyticsError, setWhAnalyticsError] = useState('');
@@ -781,6 +784,29 @@ export function PancakeWebhookPanel({
     }
   };
 
+  const toggleZaloSelect = (key: string) => {
+    setWhZaloSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const sendSelectedToZalo = async () => {
+    const keys = [...whZaloSelected];
+    if (keys.length === 0 || whBulkSending) return;
+    setWhBulkSending(true);
+    for (let i = 0; i < keys.length; i++) {
+      setWhBulkProgress({ done: i, total: keys.length });
+      await sendProductStockToZalo(keys[i]);
+      if (i < keys.length - 1) await new Promise<void>((r) => setTimeout(r, 800));
+    }
+    setWhBulkProgress(null);
+    setWhBulkSending(false);
+    setWhZaloSelected(new Set());
+  };
+
   const pingWebhookIngress = async () => {
     setWhPingBusy(true);
     setWhError('');
@@ -1042,6 +1068,30 @@ export function PancakeWebhookPanel({
                 <pre className="raw-data-pre">{JSON.stringify(whProductRows[0], null, 2)}</pre>
               </details>
             )}
+            {whZaloSelected.size > 0 && (
+              <div className="zalo-bulk-toolbar">
+                <span className="zalo-bulk-count">
+                  {whZaloSelected.size} sản phẩm được chọn
+                </span>
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={whBulkSending}
+                  onClick={() => setWhZaloSelected(new Set())}
+                >
+                  Bỏ chọn tất cả
+                </button>
+                <UiButton
+                  variant="primary"
+                  disabled={whBulkSending || whZaloSending !== null}
+                  onClick={() => void sendSelectedToZalo()}
+                >
+                  {whBulkSending
+                    ? `Đang gửi ${(whBulkProgress?.done ?? 0) + 1}/${whBulkProgress?.total ?? whZaloSelected.size}…`
+                    : `Gửi ${whZaloSelected.size} ảnh lên Zalo`}
+                </UiButton>
+              </div>
+            )}
             {whProductsFiltered.length === 0 ? (
               <p className="muted">
                 Không tìm thấy biến thể nào khớp "{whProductsSearch.trim()}".{' '}
@@ -1065,7 +1115,15 @@ export function PancakeWebhookPanel({
                   ).toUpperCase();
                   const groupKey = productCode || productName;
                   return (
-                    <div key={groupKey} className="product-group">
+                    <div key={groupKey} className={`product-group${whZaloSelected.has(groupKey) ? ' product-group--selected' : ''}`}>
+                      <label className="product-group-checkbox" title="Chọn để gửi Zalo">
+                        <input
+                          type="checkbox"
+                          checked={whZaloSelected.has(groupKey)}
+                          onChange={() => toggleZaloSelect(groupKey)}
+                          disabled={whBulkSending || whZaloSending !== null}
+                        />
+                      </label>
                       <div className="product-group-header">
                         <div className="product-group-thumb">
                           <div className="product-card-img-placeholder" aria-hidden>
@@ -1096,7 +1154,7 @@ export function PancakeWebhookPanel({
                           <div className="product-group-zalo">
                             <UiButton
                               variant="secondary"
-                              disabled={whZaloSending !== null}
+                              disabled={whZaloSending !== null || whBulkSending}
                               onClick={() =>
                                 void sendProductStockToZalo(groupKey)
                               }

@@ -742,11 +742,49 @@ a.excel-template-link,
   margin-top: 12px;
 }
 
+.zalo-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #3b82f6) 40%, transparent);
+  border-radius: 8px;
+  margin-bottom: 10px;
+
+  .zalo-bulk-count {
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex: 1;
+  }
+}
+
 .product-group {
+  position: relative;
   border: 1px solid t.$border-default;
   border-radius: t.$radius-md;
   background: t.$bg-hover;
   overflow: hidden;
+
+  &.product-group--selected {
+    border-color: var(--color-primary, #3b82f6);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent);
+  }
+
+  .product-group-checkbox {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    cursor: pointer;
+
+    input[type='checkbox'] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--color-primary, #3b82f6);
+    }
+  }
 
   &:hover {
     border-color: t.$border-strong;
