@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   PancakeWebhookConfig,
   PancakeWebhookEventRow,
@@ -194,6 +194,171 @@ function compareAnalyticsRows(
   );
 }
 
+// ── Stock image generator ────────────────────────────────────────────────────
+
+const SIZE_RE = /^(XS|S|M|L|XL|2XL|3XL|XXL|XXXL|\d{1,3})$/i;
+
+function splitColorSize(label: string): { color: string; size: string } {
+  const dashIdx = label.lastIndexOf(' - ');
+  if (dashIdx !== -1) {
+    const s = label.slice(dashIdx + 3).trim();
+    if (SIZE_RE.test(s)) return { color: label.slice(0, dashIdx).trim(), size: s.toUpperCase() };
+  }
+  const parts = label.trim().split(/\s+/);
+  if (parts.length >= 2 && SIZE_RE.test(parts[parts.length - 1])) {
+    return { color: parts.slice(0, -1).join(' '), size: parts[parts.length - 1].toUpperCase() };
+  }
+  return { color: '', size: label };
+}
+
+async function generateStockImage(
+  displayCode: string,
+  imageUrl: string | null,
+  variants: Array<{ label: string; stock: number | null }>
+): Promise<string> {
+  const W = 800, H = 1000;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  // Background: product image or gradient fallback
+  let imgLoaded = false;
+  if (imageUrl) {
+    try {
+      const img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image();
+        i.crossOrigin = 'anonymous';
+        i.onload = () => res(i);
+        i.onerror = () => rej(new Error('cors'));
+        setTimeout(() => rej(new Error('timeout')), 8000);
+        i.src = imageUrl;
+      });
+      const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+      const dx = (W - img.naturalWidth * scale) / 2;
+      const dy = (H - img.naturalHeight * scale) / 2;
+      ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
+      imgLoaded = true;
+    } catch { /* CORS blocked — use gradient */ }
+  }
+  if (!imgLoaded) {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#fce4ec');
+    grad.addColorStop(1, '#e8eaf6');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Group variants by color
+  const colorMap = new Map<string, { color: string; items: Array<{ size: string; stock: number | null }> }>();
+  for (const v of variants) {
+    const { color, size } = splitColorSize(v.label);
+    const key = color || '__';
+    if (!colorMap.has(key)) colorMap.set(key, { color, items: [] });
+    colorMap.get(key)!.items.push({ size, stock: v.stock });
+  }
+  const groups = [...colorMap.values()];
+
+  const RED = '#C8001A';
+  const WHITE = '#FFFFFF';
+  const PAD = 20, RADIUS = 18;
+  const COLOR_FONT = 34, STOCK_FONT = 44, LINE_H = 54;
+  const MARGIN = 28;
+
+  function roundRect(x: number, y: number, w: number, h: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + RADIUS, y);
+    ctx.lineTo(x + w - RADIUS, y);
+    ctx.arcTo(x + w, y, x + w, y + RADIUS, RADIUS);
+    ctx.lineTo(x + w, y + h - RADIUS);
+    ctx.arcTo(x + w, y + h, x + w - RADIUS, y + h, RADIUS);
+    ctx.lineTo(x + RADIUS, y + h);
+    ctx.arcTo(x, y + h, x, y + h - RADIUS, RADIUS);
+    ctx.lineTo(x, y + RADIUS);
+    ctx.arcTo(x, y, x + RADIUS, y, RADIUS);
+    ctx.closePath();
+  }
+
+  // [anchorX, anchorY, alignRight, alignBottom]
+  const corners: [number, number, boolean, boolean][] = [
+    [MARGIN, 110, false, false],
+    [W - MARGIN, 110, true, false],
+    [MARGIN, H - MARGIN, false, true],
+    [W - MARGIN, H - MARGIN, true, true],
+  ];
+
+  groups.slice(0, 4).forEach((group, i) => {
+    const [ax, ay, alignRight, alignBottom] = corners[i];
+
+    ctx.font = `bold ${STOCK_FONT}px sans-serif`;
+    const maxStockW = Math.max(...group.items.map(it => ctx.measureText(`${it.stock ?? '?'}${it.size}`).width));
+    ctx.font = `bold ${COLOR_FONT}px sans-serif`;
+    const colorW = group.color ? ctx.measureText(group.color).width : 0;
+    const boxW = Math.max(maxStockW, colorW) + PAD * 2;
+    const boxH = PAD + (group.color ? COLOR_FONT + 10 : 0) + group.items.length * LINE_H + PAD;
+    const boxX = alignRight ? ax - boxW : ax;
+    const boxY = alignBottom ? ay - boxH : ay;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = RED;
+    roundRect(boxX, boxY, boxW, boxH);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = WHITE;
+    ctx.textAlign = alignRight ? 'right' : 'left';
+    const textX = alignRight ? boxX + boxW - PAD : boxX + PAD;
+    let textY = boxY + PAD;
+
+    if (group.color) {
+      ctx.font = `bold ${COLOR_FONT}px sans-serif`;
+      textY += COLOR_FONT;
+      ctx.fillText(group.color, textX, textY);
+      textY += 10;
+    }
+    ctx.font = `bold ${STOCK_FONT}px sans-serif`;
+    for (const it of group.items) {
+      textY += LINE_H;
+      ctx.fillText(`${it.stock ?? '?'}${it.size}`, textX, textY);
+    }
+  });
+
+  // Product code label — top-left
+  const CODE_FONT = 50;
+  ctx.font = `bold ${CODE_FONT}px sans-serif`;
+  const codeLabelW = ctx.measureText(displayCode).width + 32;
+  const codeLabelH = CODE_FONT + 24;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = RED;
+  roundRect(16, 16, codeLabelW, codeLabelH);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = 'left';
+  ctx.font = `bold ${CODE_FONT}px sans-serif`;
+  ctx.fillText(displayCode, 32, 16 + CODE_FONT + 6);
+
+  // MeiT branding — top-right
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.textAlign = 'right';
+  ctx.font = 'italic bold 42px Georgia, "Times New Roman", serif';
+  ctx.fillText('MeiT', W - 20, 66);
+  ctx.restore();
+
+  return canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function PancakeWebhookPanel({
   toolDescription,
 }: {
@@ -220,7 +385,6 @@ export function PancakeWebhookPanel({
   const [whPingBusy, setWhPingBusy] = useState(false);
   const [whZaloSending, setWhZaloSending] = useState<string | null>(null);
   const [whZaloResults, setWhZaloResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
-  const productGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [whAnalyticsDays, setWhAnalyticsDays] = useState(7);
   const [whAnalyticsLoading, setWhAnalyticsLoading] = useState(false);
   const [whAnalyticsError, setWhAnalyticsError] = useState('');
@@ -580,43 +744,34 @@ export function PancakeWebhookPanel({
     }
   };
 
-  const sendProductStockToZalo = async (
-    groupKey: string,
-    productName: string,
-    productCode: string
-  ) => {
+  const sendProductStockToZalo = async (groupKey: string) => {
     setWhZaloSending(groupKey);
     try {
-      const el = productGroupRefs.current.get(groupKey);
-      if (!el) throw new Error('Không tìm thấy phần tử card.');
+      const group = whProductsGrouped.find(
+        (g) => (g.productCode || getProductName(g.rows[0])) === groupKey
+      );
+      if (!group) throw new Error('Không tìm thấy nhóm sản phẩm.');
 
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(el, {
-        useCORS: true,
-        allowTaint: false,
-        scale: 2,
-        backgroundColor: '#0f172a',
-        logging: false,
-      });
-      const imageBase64 = canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
+      const firstRow = group.rows[0];
+      const imgUrl = getProductImageUrl(firstRow);
+      const displayCode = group.productCode || getProductName(firstRow);
+      const variants = group.rows.map((row) => ({
+        label: getVariantLabel(row, group.productCode),
+        stock: getProductStock(row),
+      }));
+
+      const imageBase64 = await generateStockImage(displayCode, imgUrl, variants);
 
       const res = await fetch(apiUrl('/zalo-bot/send-product-stock'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64, productName, productCode }),
+        body: JSON.stringify({ imageBase64 }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      setWhZaloResults((prev) => ({
-        ...prev,
-        [groupKey]: { ok: !!data.ok, error: data.error },
-      }));
+      setWhZaloResults((prev) => ({ ...prev, [groupKey]: { ok: !!data.ok, error: data.error } }));
       if (data.ok) {
         setTimeout(() => {
-          setWhZaloResults((prev) => {
-            const next = { ...prev };
-            delete next[groupKey];
-            return next;
-          });
+          setWhZaloResults((prev) => { const next = { ...prev }; delete next[groupKey]; return next; });
         }, 4000);
       }
     } catch (err) {
@@ -899,14 +1054,7 @@ export function PancakeWebhookPanel({
                   ).toUpperCase();
                   const groupKey = productCode || productName;
                   return (
-                    <div
-                      key={groupKey}
-                      className="product-group"
-                      ref={(el) => {
-                        if (el) productGroupRefs.current.set(groupKey, el);
-                        else productGroupRefs.current.delete(groupKey);
-                      }}
-                    >
+                    <div key={groupKey} className="product-group">
                       <div className="product-group-header">
                         <div className="product-group-thumb">
                           <div className="product-card-img-placeholder" aria-hidden>
@@ -939,7 +1087,7 @@ export function PancakeWebhookPanel({
                               variant="secondary"
                               disabled={whZaloSending !== null}
                               onClick={() =>
-                                void sendProductStockToZalo(groupKey, productName, productCode)
+                                void sendProductStockToZalo(groupKey)
                               }
                             >
                               {whZaloSending === groupKey ? 'Đang gửi…' : 'Gửi Zalo'}
