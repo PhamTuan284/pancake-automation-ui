@@ -251,6 +251,41 @@ async function generateStockImage(
   return canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
 }
 
+async function stitchIntoComposite(base64Images: string[]): Promise<string> {
+  const COLS = 3;
+  const CELL_W = 400;
+  const CELL_H = 500;
+  const rows = Math.ceil(base64Images.length / COLS);
+  const totalW = Math.min(base64Images.length, COLS) * CELL_W;
+  const totalH = rows * CELL_H;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = totalW;
+  canvas.height = totalH;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, totalW, totalH);
+
+  await Promise.all(
+    base64Images.map(
+      (b64, i) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const col = i % COLS;
+            const row = Math.floor(i / COLS);
+            ctx.drawImage(img, col * CELL_W, row * CELL_H, CELL_W, CELL_H);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `data:image/png;base64,${b64}`;
+        })
+    )
+  );
+
+  return canvas.toDataURL('image/jpeg', 0.88).replace('data:image/jpeg;base64,', '');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ShopOption {
@@ -408,6 +443,7 @@ export function ProductStockZaloSection({
     if (keys.length === 0 || bulkSending) return;
     setBulkSending(true);
     try {
+      // Generate individual stock images
       const images: string[] = [];
       for (let i = 0; i < keys.length; i++) {
         setBulkProgress({ done: i, total: keys.length });
@@ -426,10 +462,15 @@ export function ProductStockZaloSection({
 
       setBulkProgress({ done: keys.length, total: keys.length });
 
-      const res = await fetch(apiUrl('/zalo-bot/send-product-stock-multi'), {
+      // Stitch into one composite image, or send directly if only one
+      const imageBase64 = images.length === 1
+        ? images[0]
+        : await stitchIntoComposite(images);
+
+      const res = await fetch(apiUrl('/zalo-bot/send-product-stock'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images }),
+        body: JSON.stringify({ imageBase64 }),
       });
       const resData = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 
