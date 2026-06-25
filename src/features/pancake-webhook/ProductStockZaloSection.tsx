@@ -253,17 +253,19 @@ async function generateStockImage(
 
 async function stitchIntoComposite(base64Images: string[]): Promise<string> {
   const COLS = 3;
-  const CELL_W = 400;
-  const CELL_H = 500;
+  const GAP = 6;
+  const CELL_W = 560;
+  const CELL_H = 700;
   const rows = Math.ceil(base64Images.length / COLS);
-  const totalW = Math.min(base64Images.length, COLS) * CELL_W;
-  const totalH = rows * CELL_H;
+  const usedCols = Math.min(base64Images.length, COLS);
+  const totalW = usedCols * CELL_W + (usedCols - 1) * GAP;
+  const totalH = rows * CELL_H + (rows - 1) * GAP;
 
   const canvas = document.createElement('canvas');
   canvas.width = totalW;
   canvas.height = totalH;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#222';
   ctx.fillRect(0, 0, totalW, totalH);
 
   await Promise.all(
@@ -274,7 +276,9 @@ async function stitchIntoComposite(base64Images: string[]): Promise<string> {
           img.onload = () => {
             const col = i % COLS;
             const row = Math.floor(i / COLS);
-            ctx.drawImage(img, col * CELL_W, row * CELL_H, CELL_W, CELL_H);
+            const x = col * (CELL_W + GAP);
+            const y = row * (CELL_H + GAP);
+            ctx.drawImage(img, x, y, CELL_W, CELL_H);
             resolve();
           };
           img.onerror = () => resolve();
@@ -283,7 +287,7 @@ async function stitchIntoComposite(base64Images: string[]): Promise<string> {
     )
   );
 
-  return canvas.toDataURL('image/jpeg', 0.88).replace('data:image/jpeg;base64,', '');
+  return canvas.toDataURL('image/jpeg', 0.92).replace('data:image/jpeg;base64,', '');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
