@@ -252,7 +252,7 @@ async function generateStockImage(
 }
 
 async function stitchIntoComposite(base64Images: string[]): Promise<string> {
-  const COLS = 3;
+  const COLS = 4;
   const GAP = 6;
   const CELL_W = 560;
   const CELL_H = 700;
