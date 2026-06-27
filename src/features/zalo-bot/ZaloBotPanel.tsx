@@ -21,17 +21,23 @@ type ZaloConfig = {
 type ZaloLog = {
   id: string;
   sentAt: string;
-  kind: 'test' | 'report' | 'scheduled';
+  kind: 'test' | 'report' | 'scheduled' | 'alert';
   success: boolean;
   error?: string;
   chatId: string;
   preview: string;
 };
 
+type AbnormalOrderConfig = {
+  enabled: boolean;
+  thresholdPct: number;
+};
+
 const KIND_LABEL: Record<ZaloLog['kind'], string> = {
   test: 'Test',
   report: 'Báo cáo',
   scheduled: 'Tự động',
+  alert: 'Cảnh báo',
 };
 
 export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
@@ -56,6 +62,11 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [reportBusy, setReportBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  const [abnormalConfig, setAbnormalConfig] = useState<AbnormalOrderConfig | null>(null);
+  const [mockBusy, setMockBusy] = useState(false);
+  const [mockMessage, setMockMessage] = useState('');
+  const [mockError, setMockError] = useState('');
 
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
@@ -83,10 +94,21 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     }
   }, []);
 
+  const loadAbnormalConfig = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/abnormal-order-config'));
+      const data = (await res.json().catch(() => ({}))) as Partial<AbnormalOrderConfig>;
+      if (typeof data.enabled === 'boolean' && typeof data.thresholdPct === 'number') {
+        setAbnormalConfig({ enabled: data.enabled, thresholdPct: data.thresholdPct });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     void loadConfig();
     void loadLogs();
-  }, [loadConfig, loadLogs]);
+    void loadAbnormalConfig();
+  }, [loadConfig, loadLogs, loadAbnormalConfig]);
 
   async function handleSetWebhook() {
     setWebhookBusy(true);
@@ -157,6 +179,24 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       setActionError(err instanceof Error ? err.message : 'Gửi báo cáo thất bại.');
     } finally {
       setReportBusy(false);
+      void loadLogs();
+    }
+  }
+
+  async function handleSendMockAlert() {
+    setMockBusy(true);
+    setMockMessage('');
+    setMockError('');
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/send-mock-abnormal-order'), { method: 'POST' });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Gửi thất bại');
+      setMockMessage('Đã gửi tin nhắn cảnh báo mẫu lên Zalo!');
+      setTimeout(() => setMockMessage(''), 6000);
+    } catch (err) {
+      setMockError(err instanceof Error ? err.message : 'Gửi thất bại.');
+    } finally {
+      setMockBusy(false);
       void loadLogs();
     }
   }
@@ -313,6 +353,47 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
         )}
         {actionMessage && <p className="hint hint-ok" style={{ marginTop: '0.75rem' }}>{actionMessage}</p>}
         {actionError && <p className="hint hint-error" style={{ marginTop: '0.75rem' }}>{actionError}</p>}
+      </section>
+
+      <section className="card" aria-labelledby="zalo-abnormal-title">
+        <h2 id="zalo-abnormal-title" className="section-title">Cảnh báo đơn hàng bất thường</h2>
+        <p className="muted small">
+          Tự động gửi cảnh báo lên nhóm Zalo khi{' '}
+          <strong>giá sau chiết khấu / giá gốc</strong> thấp hơn ngưỡng cấu hình.
+          Công thức:{' '}
+          <code>Giá gốc − (Giảm SP − Sàn trợ giá) − Phí sàn = Giá sau chiết khấu</code>.
+        </p>
+
+        {abnormalConfig && (
+          <ul className="muted small" style={{ marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+            <li>
+              Trạng thái:{' '}
+              {abnormalConfig.enabled
+                ? <strong style={{ color: 'var(--color-ok, green)' }}>✓ Bật</strong>
+                : <strong style={{ color: 'var(--color-error, red)' }}>✗ Tắt</strong>}
+            </li>
+            <li>
+              Ngưỡng cảnh báo: giá sau chiết khấu {'<'}{' '}
+              <strong>{abnormalConfig.thresholdPct}%</strong> giá gốc
+            </li>
+          </ul>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <UiButton
+            onClick={() => void handleSendMockAlert()}
+            disabled={mockBusy || !canSend}
+          >
+            {mockBusy ? 'Đang gửi…' : '⚠️ Gửi cảnh báo mẫu'}
+          </UiButton>
+        </div>
+        <p className="muted small" style={{ marginTop: '0.5rem' }}>
+          Gửi đơn demo (giá gốc 850.000đ, sau chiết khấu 366.995đ = 43.2%) để xem trước định dạng tin nhắn.
+          Cấu hình ngưỡng qua API: <code>PUT /zalo-bot/abnormal-order-config</code>{' '}
+          với body <code>{'{ "thresholdPct": 60, "enabled": true }'}</code>.
+        </p>
+        {mockMessage && <p className="hint hint-ok" style={{ marginTop: '0.5rem' }}>{mockMessage}</p>}
+        {mockError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{mockError}</p>}
       </section>
 
       <section className="card" aria-labelledby="zalo-logs-title">
