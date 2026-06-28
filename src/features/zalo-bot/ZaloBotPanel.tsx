@@ -413,7 +413,11 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
               min={1}
               max={100}
               value={editThreshold}
-              onChange={(e) => setEditThreshold(Math.min(100, Math.max(1, Number(e.target.value))))}
+              onChange={(e) => {
+                const v = e.target.valueAsNumber;
+                if (!isNaN(v)) setEditThreshold(v);
+              }}
+              onBlur={() => setEditThreshold((t) => Math.min(100, Math.max(1, t)))}
               style={{ width: '64px', textAlign: 'center' }}
             />
             <span className="muted small">% giá gốc</span>
