@@ -64,6 +64,11 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [actionError, setActionError] = useState('');
 
   const [abnormalConfig, setAbnormalConfig] = useState<AbnormalOrderConfig | null>(null);
+  const [editEnabled, setEditEnabled] = useState(true);
+  const [editThreshold, setEditThreshold] = useState(60);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [mockBusy, setMockBusy] = useState(false);
   const [mockMessage, setMockMessage] = useState('');
   const [mockError, setMockError] = useState('');
@@ -100,6 +105,8 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       const data = (await res.json().catch(() => ({}))) as Partial<AbnormalOrderConfig>;
       if (typeof data.enabled === 'boolean' && typeof data.thresholdPct === 'number') {
         setAbnormalConfig({ enabled: data.enabled, thresholdPct: data.thresholdPct });
+        setEditEnabled(data.enabled);
+        setEditThreshold(data.thresholdPct);
       }
     } catch { /* ignore */ }
   }, []);
@@ -180,6 +187,30 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     } finally {
       setReportBusy(false);
       void loadLogs();
+    }
+  }
+
+  async function handleSaveAbnormalConfig() {
+    setSaveBusy(true);
+    setSaveMessage('');
+    setSaveError('');
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/abnormal-order-config'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: editEnabled, thresholdPct: editThreshold }),
+      });
+      const data = (await res.json().catch(() => ({}))) as Partial<AbnormalOrderConfig & { error?: string }>;
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Lưu thất bại');
+      if (typeof data.enabled === 'boolean' && typeof data.thresholdPct === 'number') {
+        setAbnormalConfig({ enabled: data.enabled, thresholdPct: data.thresholdPct });
+      }
+      setSaveMessage('Đã lưu cấu hình!');
+      setTimeout(() => setSaveMessage(''), 4000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Lưu thất bại.');
+    } finally {
+      setSaveBusy(false);
     }
   }
 
@@ -364,23 +395,37 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
           <code>Giá gốc − (Giảm SP − Sàn trợ giá) − Phí sàn = Giá sau chiết khấu</code>.
         </p>
 
-        {abnormalConfig && (
-          <ul className="muted small" style={{ marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
-            <li>
-              Trạng thái:{' '}
-              {abnormalConfig.enabled
-                ? <strong style={{ color: 'var(--color-ok, green)' }}>✓ Bật</strong>
-                : <strong style={{ color: 'var(--color-error, red)' }}>✗ Tắt</strong>}
-            </li>
-            <li>
-              Ngưỡng cảnh báo: giá sau chiết khấu {'<'}{' '}
-              <strong>{abnormalConfig.thresholdPct}%</strong> giá gốc
-            </li>
-          </ul>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem', maxWidth: '360px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={editEnabled}
+              onChange={(e) => setEditEnabled(e.target.checked)}
+            />
+            <span className="muted small">Bật cảnh báo tự động</span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="muted small" style={{ whiteSpace: 'nowrap' }}>Ngưỡng cảnh báo &lt;</span>
+            <input
+              type="number"
+              className="search-input"
+              min={1}
+              max={100}
+              value={editThreshold}
+              onChange={(e) => setEditThreshold(Math.min(100, Math.max(1, Number(e.target.value))))}
+              style={{ width: '64px', textAlign: 'center' }}
+            />
+            <span className="muted small">% giá gốc</span>
+          </label>
+        </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <UiButton onClick={() => void handleSaveAbnormalConfig()} disabled={saveBusy}>
+            {saveBusy ? 'Đang lưu…' : 'Lưu cấu hình'}
+          </UiButton>
           <UiButton
+            variant="secondary"
             onClick={() => void handleSendMockAlert()}
             disabled={mockBusy || !canSend}
           >
@@ -388,10 +433,10 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
           </UiButton>
         </div>
         <p className="muted small" style={{ marginTop: '0.5rem' }}>
-          Gửi đơn demo (giá gốc 850.000đ, sau chiết khấu 366.995đ = 43.2%) để xem trước định dạng tin nhắn.
-          Cấu hình ngưỡng qua API: <code>PUT /zalo-bot/abnormal-order-config</code>{' '}
-          với body <code>{'{ "thresholdPct": 60, "enabled": true }'}</code>.
+          Đơn mẫu: giá gốc 850.000đ → sau chiết khấu 366.995đ (43.2%) — dùng để xem trước định dạng tin nhắn.
         </p>
+        {saveMessage && <p className="hint hint-ok" style={{ marginTop: '0.5rem' }}>{saveMessage}</p>}
+        {saveError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{saveError}</p>}
         {mockMessage && <p className="hint hint-ok" style={{ marginTop: '0.5rem' }}>{mockMessage}</p>}
         {mockError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{mockError}</p>}
       </section>
