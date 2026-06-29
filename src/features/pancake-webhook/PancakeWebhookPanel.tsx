@@ -5,6 +5,8 @@ import type {
   PancakeWebhookShopConfig,
   VariantSalesAnalytics,
   VariantSalesRow,
+  EmployeeProductivityRow,
+  EmployeeProductivityResult,
 } from '../../types';
 import { apiUrl } from '../../lib/api';
 import {
@@ -16,13 +18,11 @@ import { ProductStockZaloSection } from './ProductStockZaloSection';
 
 const DEFAULT_WEBHOOK_TYPES = [
   'orders',
-  'customers',
   'products',
   'variations_warehouses',
 ];
 const WEBHOOK_KIND_ORDER = [
   'orders',
-  'customers',
   'products',
   'variations_warehouses',
   'crm',
@@ -31,7 +31,6 @@ const WEBHOOK_KIND_ORDER = [
 
 function webhookKindLabel(kind: string): string {
   if (kind === 'orders') return 'Đơn hàng';
-  if (kind === 'customers') return 'Khách hàng';
   if (kind === 'products') return 'Sản phẩm';
   if (kind === 'variations_warehouses') return 'Tồn kho';
   if (kind === 'crm') return 'CRM';
@@ -122,6 +121,15 @@ export function PancakeWebhookPanel({
   const [whAnalyticsSortDir, setWhAnalyticsSortDir] = useState<'asc' | 'desc'>(
     'asc'
   );
+
+  type EmpProdSortKey = keyof EmployeeProductivityRow;
+  const [empProdDays, setEmpProdDays] = useState(30);
+  const [empProdRole, setEmpProdRole] = useState<'seller' | 'care' | 'creator'>('seller');
+  const [empProdLoading, setEmpProdLoading] = useState(false);
+  const [empProdError, setEmpProdError] = useState('');
+  const [empProdResult, setEmpProdResult] = useState<EmployeeProductivityResult | null>(null);
+  const [empProdSortKey, setEmpProdSortKey] = useState<EmpProdSortKey>('rank');
+  const [empProdSortDir, setEmpProdSortDir] = useState<'asc' | 'desc'>('asc');
 
   const whActiveShop = useMemo(() => {
     const shops = whConfig?.shops ?? [];
@@ -245,6 +253,106 @@ export function PancakeWebhookPanel({
     []
   );
 
+  const loadEmployeeProductivity = useCallback(async () => {
+    setEmpProdLoading(true);
+    setEmpProdError('');
+    try {
+      const res = await fetch(
+        apiUrl(
+          `/pancake-webhook/analytics/employee-productivity?days=${empProdDays}&role=${empProdRole}&shop=${whSelectedShop}`
+        )
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        result?: EmployeeProductivityResult;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Không tải được năng suất nhân viên');
+      }
+      setEmpProdResult(data.result ?? null);
+      setEmpProdSortKey('rank');
+      setEmpProdSortDir('asc');
+    } catch (err) {
+      console.error(err);
+      setEmpProdResult(null);
+      setEmpProdError(
+        err instanceof Error ? err.message : 'Không tải được dữ liệu.'
+      );
+    } finally {
+      setEmpProdLoading(false);
+    }
+  }, [empProdDays, empProdRole, whSelectedShop]);
+
+  const empProdDisplayRows = useMemo(() => {
+    const rows = empProdResult?.rows ?? [];
+    const sign = empProdSortDir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = a[empProdSortKey];
+      const bv = b[empProdSortKey];
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return av.localeCompare(bv, 'vi') * sign;
+      }
+      return ((Number(av) - Number(bv)) || 0) * sign;
+    });
+  }, [empProdResult, empProdSortKey, empProdSortDir]);
+
+  const empProdColumns = useMemo(
+    (): UiDataTableColumn<EmployeeProductivityRow>[] => [
+      {
+        key: 'rank',
+        header: '#',
+        sortable: true,
+        render: (row) => String(row.rank),
+      },
+      {
+        key: 'employeeName',
+        header: 'Nhân viên',
+        sortable: true,
+        render: (row) => row.employeeName || row.employeeId,
+      },
+      {
+        key: 'orderCount',
+        header: 'Số đơn',
+        sortable: true,
+        render: (row) => row.orderCount.toLocaleString('vi-VN'),
+      },
+      {
+        key: 'totalRevenue',
+        header: 'Doanh thu',
+        sortable: true,
+        render: (row) => row.totalRevenue.toLocaleString('vi-VN') + ' ₫',
+      },
+      {
+        key: 'avgOrderValue',
+        header: 'TB/đơn',
+        sortable: true,
+        render: (row) =>
+          row.avgOrderValue > 0
+            ? row.avgOrderValue.toLocaleString('vi-VN') + ' ₫'
+            : '—',
+      },
+      {
+        key: 'cancelledCount',
+        header: 'Đơn huỷ',
+        sortable: true,
+        render: (row) =>
+          row.cancelledCount > 0
+            ? row.cancelledCount.toLocaleString('vi-VN')
+            : '—',
+      },
+    ],
+    []
+  );
+
+  const handleEmpProdSortChange = useCallback(
+    (next: { key: string; dir: 'asc' | 'desc' }) => {
+      setEmpProdSortKey(next.key as EmpProdSortKey);
+      setEmpProdSortDir(next.dir);
+    },
+    []
+  );
+
   const whEventsGrouped = useMemo(() => {
     const map = new Map<string, PancakeWebhookEventRow[]>();
     for (const ev of whEvents) {
@@ -343,7 +451,7 @@ export function PancakeWebhookPanel({
       return;
     }
     if (!whTypes.length) {
-      setWhError('Chọn ít nhất một loại dữ liệu (orders, customers, …).');
+      setWhError('Chọn ít nhất một loại dữ liệu (orders, products, …).');
       return;
     }
     setWhRegisterBusy(true);
@@ -717,6 +825,96 @@ export function PancakeWebhookPanel({
               />
             )}
             <p className="muted small">{whAnalytics.note}</p>
+          </>
+        )}
+      </section>
+
+      <section className="card" aria-labelledby="wh-emp-prod-title">
+        <div className="table-head">
+          <h2 id="wh-emp-prod-title" className="section-title">
+            Năng suất nhân viên
+          </h2>
+          <div className="table-head-actions">
+            <label className="muted small">
+              Shop{' '}
+              <select
+                value={whSelectedShop}
+                onChange={(e) =>
+                  setWhSelectedShop(
+                    e.target.value as PancakeWebhookShopConfig['shopKey']
+                  )
+                }
+              >
+                {(whConfig?.shops ?? []).map((s) => (
+                  <option key={s.shopKey} value={s.shopKey}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="muted small">
+              Số ngày{' '}
+              <select
+                value={empProdDays}
+                onChange={(e) => setEmpProdDays(Number(e.target.value))}
+              >
+                <option value={7}>7</option>
+                <option value={14}>14</option>
+                <option value={30}>30</option>
+                <option value={60}>60</option>
+              </select>
+            </label>
+            <label className="muted small">
+              Vai trò{' '}
+              <select
+                value={empProdRole}
+                onChange={(e) =>
+                  setEmpProdRole(e.target.value as 'seller' | 'care' | 'creator')
+                }
+              >
+                <option value="seller">Người bán</option>
+                <option value="care">Chăm sóc</option>
+                <option value="creator">Người tạo đơn</option>
+              </select>
+            </label>
+            <UiButton
+              onClick={() => void loadEmployeeProductivity()}
+              disabled={empProdLoading || !whActiveShop?.hasApiKey}
+            >
+              {empProdLoading ? 'Đang tải…' : 'Tải từ Pancake'}
+            </UiButton>
+          </div>
+        </div>
+        <p className="muted small">
+          Tổng hợp đơn hàng từ Pancake Open API trong kỳ, nhóm theo nhân viên
+          (người bán / chăm sóc / tạo đơn). Doanh thu tính trên đơn không huỷ
+          và không trả hàng.
+        </p>
+        {empProdError && (
+          <p className="hint hint-error">{empProdError}</p>
+        )}
+        {empProdResult && (
+          <>
+            <p className="muted small">
+              Kỳ {empProdResult.windowDays} ngày · tổng{' '}
+              <strong>{empProdResult.totalOrders}</strong> đơn ·{' '}
+              <strong>{empProdResult.rows.length}</strong> nhân viên
+            </p>
+            {empProdResult.rows.length === 0 ? (
+              <p className="muted">
+                Không có dữ liệu. Kiểm tra lại vai trò hoặc khoảng thời gian.
+              </p>
+            ) : (
+              <UiDataTable
+                rows={empProdDisplayRows}
+                columns={empProdColumns}
+                sort={{ key: empProdSortKey, dir: empProdSortDir }}
+                onSortChange={handleEmpProdSortChange}
+                rowKey={(row) => row.employeeId || String(row.rank)}
+                wrapClassName="webhook-openapi-wrap"
+                tableClassName="data-table--openapi"
+              />
+            )}
           </>
         )}
       </section>

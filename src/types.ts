@@ -79,6 +79,25 @@ export type VariantSalesAnalytics = {
   note: string;
 };
 
+/** GET /pancake-webhook/analytics/employee-productivity */
+export type EmployeeProductivityRow = {
+  rank: number;
+  employeeId: string;
+  employeeName: string;
+  orderCount: number;
+  totalRevenue: number;
+  avgOrderValue: number;
+  cancelledCount: number;
+};
+
+export type EmployeeProductivityResult = {
+  windowDays: number;
+  from: string;
+  to: string;
+  totalOrders: number;
+  rows: EmployeeProductivityRow[];
+};
+
 export type SalaryInputDraft = {
   employeeName: string;
   baseSalary: number;
