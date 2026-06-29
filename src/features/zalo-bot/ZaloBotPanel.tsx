@@ -65,7 +65,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
 
   const [abnormalConfig, setAbnormalConfig] = useState<AbnormalOrderConfig | null>(null);
   const [editEnabled, setEditEnabled] = useState(true);
-  const [editThreshold, setEditThreshold] = useState(60);
+  const [editThreshold, setEditThreshold] = useState('60');
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -106,7 +106,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       if (typeof data.enabled === 'boolean' && typeof data.thresholdPct === 'number') {
         setAbnormalConfig({ enabled: data.enabled, thresholdPct: data.thresholdPct });
         setEditEnabled(data.enabled);
-        setEditThreshold(data.thresholdPct);
+        setEditThreshold(String(data.thresholdPct));
       }
     } catch { /* ignore */ }
   }, []);
@@ -198,7 +198,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       const res = await fetch(apiUrl('/zalo-bot/abnormal-order-config'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: editEnabled, thresholdPct: editThreshold }),
+        body: JSON.stringify({ enabled: editEnabled, thresholdPct: Math.min(100, Math.max(1, parseInt(editThreshold, 10) || 60)) }),
       });
       const data = (await res.json().catch(() => ({}))) as Partial<AbnormalOrderConfig & { error?: string }>;
       if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Lưu thất bại');
@@ -409,23 +409,33 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
             <span className="muted small" style={{ whiteSpace: 'nowrap' }}>Ngưỡng cảnh báo &lt;</span>
             <input
               type="number"
-              className="search-input"
               min={1}
               max={100}
               value={editThreshold}
-              onChange={(e) => {
-                const v = e.target.valueAsNumber;
-                if (!isNaN(v)) setEditThreshold(v);
+              onChange={(e) => setEditThreshold(e.target.value)}
+              onBlur={() => {
+                const n = parseInt(editThreshold, 10);
+                setEditThreshold(String(isNaN(n) ? 60 : Math.min(100, Math.max(1, n))));
               }}
-              onBlur={() => setEditThreshold((t) => Math.min(100, Math.max(1, t)))}
-              style={{ width: '64px', textAlign: 'center' }}
+              style={{
+                width: '72px',
+                padding: '0 6px',
+                height: '32px',
+                border: '1px solid var(--color-border, #444)',
+                borderRadius: '4px',
+                background: 'var(--bg-page, #1e1e1e)',
+                color: 'var(--text-primary, #fff)',
+                fontSize: '14px',
+                textAlign: 'center',
+                outline: 'none',
+              }}
             />
             <span className="muted small">% giá gốc</span>
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-          <UiButton onClick={() => void handleSaveAbnormalConfig()} disabled={saveBusy}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem', alignItems: 'center' }}>
+          <UiButton onClick={() => void handleSaveAbnormalConfig()} disabled={saveBusy} style={{ width: 'auto' }}>
             {saveBusy ? 'Đang lưu…' : 'Lưu cấu hình'}
           </UiButton>
           <UiButton
