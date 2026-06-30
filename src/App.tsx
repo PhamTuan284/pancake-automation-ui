@@ -13,6 +13,7 @@ import { SalaryPanel } from './features/salary/SalaryPanel';
 import { TelegramBotPanel } from './features/telegram-bot/TelegramBotPanel';
 import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
+import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
 import type { TabAccessLevel } from './features/admin/TabVisibilitySettings';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiUrl } from './lib/api';
@@ -168,6 +169,10 @@ function AppInner() {
 
         {activeToolId === 'zalo-bot' && (
           <ZaloBotPanel toolDescription={activeTool?.description ?? ''} />
+        )}
+
+        {activeToolId === 'admin-storefront' && (
+          <AdminStorefrontPanel toolDescription={activeTool?.description ?? ''} />
         )}
 
         {activeToolId === ADMIN_TOOL_ID && (

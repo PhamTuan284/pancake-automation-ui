@@ -33,6 +33,11 @@ export const TOOLS: ToolDef[] = [
       'Gửi báo cáo biến thể bán chạy từ Pancake Webhook vào nhóm Zalo tự động mỗi ngày.',
   },
   {
+    id: 'admin-storefront',
+    label: 'Admin Storefront',
+    description: 'Cấu hình hero banner, category banner và giao diện storefront MeiT.',
+  },
+  {
     id: 'admin',
     label: 'Admin',
     description: 'Cài đặt hệ thống: quản lý tab, bot và người dùng.',
