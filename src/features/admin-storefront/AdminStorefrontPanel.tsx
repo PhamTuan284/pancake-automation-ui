@@ -1,32 +1,50 @@
-import { useEffect, useState } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
-import Divider from '@mui/material/Divider';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import InputAdornment from '@mui/material/InputAdornment';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../context/AuthContext';
 import { apiUrl } from '../../lib/api';
 
-type HeroBannerConfig = {
-  videoUrl: string;
-  posterUrl: string;
-};
+// ─── local types ────────────────────────────────────────────────────────────
 
-type CategoryBannerConfig = {
-  id: string;
-  imageUrl: string;
-};
+type HeroBannerConfig = { videoUrl: string; posterUrl: string };
+type ImageOverride = { id: string; imageUrl: string };
 
 type StorefrontConfig = {
   heroBanner: HeroBannerConfig;
-  categoryBanners: CategoryBannerConfig[];
+  categoryBanners: ImageOverride[];
+  productImageOverrides: ImageOverride[];
+  variantImageOverrides: ImageOverride[];
+};
+
+type Variant = {
+  id: string;
+  name: string;
+  images: string[];
+  fields: { name: string; value: string }[];
+};
+
+type Product = {
+  id: string;
+  name: string;
+  images: string[];
+  variants: Variant[];
 };
 
 type StoreCategory = {
@@ -39,7 +57,27 @@ type StoreCategory = {
 const DEFAULT_CONFIG: StorefrontConfig = {
   heroBanner: { videoUrl: '', posterUrl: '' },
   categoryBanners: [],
+  productImageOverrides: [],
+  variantImageOverrides: [],
 };
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function ImagePreview({ src }: { src: string }) {
+  const [show, setShow] = useState(true);
+  if (!src || !show) return null;
+  return (
+    <Box
+      component="img"
+      src={src}
+      alt="preview"
+      sx={{ maxHeight: 140, maxWidth: '100%', objectFit: 'cover', borderRadius: 1, mt: 1 }}
+      onError={() => setShow(false)}
+    />
+  );
+}
+
+// ─── Hero Banner tab ─────────────────────────────────────────────────────────
 
 function HeroBannerTab({
   config,
@@ -53,7 +91,6 @@ function HeroBannerTab({
       <Typography variant="body2" color="text.secondary">
         Cấu hình video và ảnh nền cho phần hero ở đầu trang chủ storefront.
       </Typography>
-
       <Card variant="outlined">
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
@@ -62,7 +99,7 @@ function HeroBannerTab({
             value={config.videoUrl}
             onChange={(e) => onChange({ ...config, videoUrl: e.target.value })}
             fullWidth
-            helperText="URL file video MP4 cho hero banner. Để trống để dùng giá trị từ biến môi trường."
+            helperText="URL file video MP4. Để trống để dùng biến môi trường VITE_HERO_VIDEO_URL."
           />
           <TextField
             label="Poster Image URL (ảnh preview)"
@@ -70,49 +107,36 @@ function HeroBannerTab({
             value={config.posterUrl}
             onChange={(e) => onChange({ ...config, posterUrl: e.target.value })}
             fullWidth
-            helperText="URL ảnh hiển thị trong khi video đang tải."
+            helperText="Ảnh hiển thị trong khi video đang tải."
           />
-          {config.posterUrl && (
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                Xem trước poster:
-              </Typography>
-              <Box
-                component="img"
-                src={config.posterUrl}
-                alt="Hero poster preview"
-                sx={{ maxHeight: 200, maxWidth: '100%', objectFit: 'cover', borderRadius: 1 }}
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </Box>
-          )}
+          <ImagePreview src={config.posterUrl} />
         </CardContent>
       </Card>
     </Box>
   );
 }
 
+// ─── Category Banners tab ─────────────────────────────────────────────────────
+
 function CategoryBannersTab({
   banners,
   categories,
   onChange,
 }: {
-  banners: CategoryBannerConfig[];
+  banners: ImageOverride[];
   categories: StoreCategory[];
-  onChange: (updated: CategoryBannerConfig[]) => void;
+  onChange: (updated: ImageOverride[]) => void;
 }) {
-  function getBanner(categoryId: string): string {
-    return banners.find((b) => b.id === categoryId)?.imageUrl ?? '';
+  function getBanner(id: string) {
+    return banners.find((b) => b.id === id)?.imageUrl ?? '';
   }
 
-  function setBanner(categoryId: string, imageUrl: string) {
-    const existing = banners.find((b) => b.id === categoryId);
-    if (existing) {
-      onChange(banners.map((b) => (b.id === categoryId ? { ...b, imageUrl } : b)));
+  function setBanner(id: string, imageUrl: string) {
+    const exists = banners.find((b) => b.id === id);
+    if (exists) {
+      onChange(banners.map((b) => (b.id === id ? { id, imageUrl } : b)));
     } else {
-      onChange([...banners, { id: categoryId, imageUrl }]);
+      onChange([...banners, { id, imageUrl }]);
     }
   }
 
@@ -121,49 +145,25 @@ function CategoryBannersTab({
       <Typography variant="body2" color="text.secondary">
         Cấu hình ảnh banner cho từng danh mục sản phẩm hiển thị trên trang chủ.
       </Typography>
-
-      {categories.length === 0 && (
-        <Alert severity="info">Đang tải danh sách danh mục...</Alert>
-      )}
-
+      {categories.length === 0 && <Alert severity="info">Đang tải danh sách danh mục...</Alert>}
       {categories.map((cat) => (
         <Card key={cat.id} variant="outlined">
           <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>
-                {cat.nameVi}
-              </Typography>
+              <Typography variant="subtitle1" fontWeight={600}>{cat.nameVi}</Typography>
               <Typography variant="caption" color="text.secondary">
-                ({cat.nameEn}) — ID: {cat.id}
+                ({cat.nameEn}) · {cat.id}
               </Typography>
             </Box>
-
             <TextField
               label="Image URL"
-              placeholder="https://example.com/category-banner.jpg"
+              placeholder="https://example.com/banner.jpg"
               value={getBanner(cat.id)}
               onChange={(e) => setBanner(cat.id, e.target.value)}
               fullWidth
               size="small"
             />
-
-            {getBanner(cat.id) && (
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                  Xem trước:
-                </Typography>
-                <Box
-                  component="img"
-                  src={getBanner(cat.id)}
-                  alt={`${cat.nameVi} banner preview`}
-                  sx={{ maxHeight: 160, maxWidth: '100%', objectFit: 'cover', borderRadius: 1 }}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </Box>
-            )}
-
+            <ImagePreview src={getBanner(cat.id)} />
             {cat.subcategories.length > 0 && (
               <Typography variant="caption" color="text.secondary">
                 Danh mục con: {cat.subcategories.map((s) => s.nameVi).join(', ')}
@@ -175,6 +175,229 @@ function CategoryBannersTab({
     </Box>
   );
 }
+
+// ─── Product Images tab ───────────────────────────────────────────────────────
+
+function OverrideField({
+  label,
+  value,
+  onChange,
+  pancakeImages,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  pancakeImages: string[];
+}) {
+  const activeImage = value || pancakeImages[0] || '';
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <TextField
+        label={label}
+        placeholder="https://example.com/image.jpg (để trống = dùng ảnh Pancake)"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        fullWidth
+        size="small"
+        helperText={
+          value
+            ? 'Override đang hoạt động'
+            : pancakeImages.length > 0
+            ? `Đang dùng ảnh Pancake (${pancakeImages.length} ảnh)`
+            : 'Không có ảnh từ Pancake'
+        }
+        InputProps={
+          value
+            ? {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Chip label="Override" size="small" color="primary" />
+                  </InputAdornment>
+                ),
+              }
+            : undefined
+        }
+      />
+      {activeImage && <ImagePreview src={activeImage} />}
+    </Box>
+  );
+}
+
+function ProductImagesTab({
+  productOverrides,
+  variantOverrides,
+  onProductOverride,
+  onVariantOverride,
+}: {
+  productOverrides: ImageOverride[];
+  variantOverrides: ImageOverride[];
+  onProductOverride: (id: string, imageUrl: string) => void;
+  onVariantOverride: (id: string, imageUrl: string) => void;
+}) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchPage = useCallback((q: string, pg: number, append: boolean) => {
+    setLoadingProducts(true);
+    const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
+    if (q) params.set('search', q);
+    fetch(apiUrl(`/store/products?${params}`))
+      .then((r) => r.json())
+      .then((data: { products: Product[]; total: number }) => {
+        setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
+        setTotal(data.total);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  useEffect(() => {
+    fetchPage('', 1, false);
+  }, [fetchPage]);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      fetchPage(value, 1, false);
+    }, 400);
+  }
+
+  function loadMore() {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchPage(search, nextPage, true);
+  }
+
+  function getProductOverride(id: string) {
+    return productOverrides.find((o) => o.id === id)?.imageUrl ?? '';
+  }
+  function getVariantOverride(id: string) {
+    return variantOverrides.find((o) => o.id === id)?.imageUrl ?? '';
+  }
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="body2" color="text.secondary">
+        Đặt ảnh override cho từng sản phẩm và biến thể. Nếu để trống, hệ thống dùng ảnh từ Pancake.
+      </Typography>
+
+      <TextField
+        placeholder="Tìm sản phẩm theo tên..."
+        value={search}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        fullWidth
+        size="small"
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+
+      {loadingProducts && products.length === 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={32} />
+        </Box>
+      )}
+
+      {products.map((product) => (
+        <Accordion key={product.id} variant="outlined" disableGutters>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+              {(getProductOverride(product.id) || product.images[0]) && (
+                <Box
+                  component="img"
+                  src={getProductOverride(product.id) || product.images[0]}
+                  alt=""
+                  sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" fontWeight={600} noWrap>{product.name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  ID: {product.id} · {product.variants.length} biến thể
+                  {getProductOverride(product.id) && (
+                    <Chip label="Override" size="small" color="primary" sx={{ ml: 1, height: 16, fontSize: 10 }} />
+                  )}
+                </Typography>
+              </Box>
+            </Box>
+          </AccordionSummary>
+
+          <AccordionDetails>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Product-level image override */}
+              <Box>
+                <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  ẢNH SẢN PHẨM (CHÍNH)
+                </Typography>
+                <OverrideField
+                  label="Override ảnh sản phẩm"
+                  value={getProductOverride(product.id)}
+                  onChange={(v) => onProductOverride(product.id, v)}
+                  pancakeImages={product.images}
+                />
+              </Box>
+
+              {/* Variant overrides */}
+              {product.variants.length > 0 && (
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    ẢNH BIẾN THỂ
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {product.variants.map((variant) => (
+                      <Card key={variant.id} variant="outlined" sx={{ p: 1.5 }}>
+                        <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
+                          {variant.name || variant.fields.map((f) => `${f.name}: ${f.value}`).join(' · ') || variant.id}
+                          {getVariantOverride(variant.id) && (
+                            <Chip label="Override" size="small" color="primary" sx={{ ml: 1, height: 16, fontSize: 10 }} />
+                          )}
+                        </Typography>
+                        <OverrideField
+                          label="Override ảnh biến thể"
+                          value={getVariantOverride(variant.id)}
+                          onChange={(v) => onVariantOverride(variant.id, v)}
+                          pancakeImages={variant.images}
+                        />
+                      </Card>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      ))}
+
+      {products.length < total && (
+        <Button
+          variant="outlined"
+          onClick={loadMore}
+          disabled={loadingProducts}
+          startIcon={loadingProducts ? <CircularProgress size={16} /> : undefined}
+        >
+          Tải thêm ({products.length}/{total})
+        </Button>
+      )}
+
+      {!loadingProducts && products.length === 0 && (
+        <Alert severity="info">Không tìm thấy sản phẩm nào.</Alert>
+      )}
+    </Box>
+  );
+}
+
+// ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function AdminStorefrontPanel({ toolDescription }: { toolDescription: string }) {
   const { user } = useAuth();
@@ -192,7 +415,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
       fetch(apiUrl('/store/categories')).then((r) => r.json()),
     ])
       .then(([cfg, cats]: [StorefrontConfig, StoreCategory[]]) => {
-        setConfig(cfg);
+        setConfig({ ...DEFAULT_CONFIG, ...cfg });
         setCategories(Array.isArray(cats) ? cats : []);
       })
       .catch(() => {})
@@ -217,8 +440,8 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? 'Lưu thất bại.');
       }
-      const updated = await res.json() as StorefrontConfig;
-      setConfig(updated);
+      const updated = (await res.json()) as StorefrontConfig;
+      setConfig({ ...DEFAULT_CONFIG, ...updated });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -226,6 +449,26 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleProductOverride(id: string, imageUrl: string) {
+    setConfig((prev) => {
+      const exists = prev.productImageOverrides.find((o) => o.id === id);
+      const updated = exists
+        ? prev.productImageOverrides.map((o) => (o.id === id ? { id, imageUrl } : o))
+        : [...prev.productImageOverrides, { id, imageUrl }];
+      return { ...prev, productImageOverrides: updated };
+    });
+  }
+
+  function handleVariantOverride(id: string, imageUrl: string) {
+    setConfig((prev) => {
+      const exists = prev.variantImageOverrides.find((o) => o.id === id);
+      const updated = exists
+        ? prev.variantImageOverrides.map((o) => (o.id === id ? { id, imageUrl } : o))
+        : [...prev.variantImageOverrides, { id, imageUrl }];
+      return { ...prev, variantImageOverrides: updated };
+    });
   }
 
   if (!user) {
@@ -251,7 +494,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
   }
 
   return (
-    <Box sx={{ p: 3, maxWidth: 800 }}>
+    <Box sx={{ p: 3, maxWidth: 860 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
         <Box>
           <Typography variant="h5">Admin Storefront</Typography>
@@ -283,6 +526,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
           <Tabs value={activeTab} onChange={(_e, v: number) => setActiveTab(v)} sx={{ mb: 3 }}>
             <Tab label="Hero Banner" />
             <Tab label="Category Banners" />
+            <Tab label="Product Images" />
           </Tabs>
 
           {activeTab === 0 && (
@@ -296,6 +540,14 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
               banners={config.categoryBanners}
               categories={categories}
               onChange={(updated) => setConfig((prev) => ({ ...prev, categoryBanners: updated }))}
+            />
+          )}
+          {activeTab === 2 && (
+            <ProductImagesTab
+              productOverrides={config.productImageOverrides}
+              variantOverrides={config.variantImageOverrides}
+              onProductOverride={handleProductOverride}
+              onVariantOverride={handleVariantOverride}
             />
           )}
         </>
