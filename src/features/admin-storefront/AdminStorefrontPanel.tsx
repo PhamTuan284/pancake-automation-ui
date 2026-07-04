@@ -150,7 +150,7 @@ function CategoryBannersTab({
         <Card key={cat.id} variant="outlined">
           <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>{cat.nameVi}</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{cat.nameVi}</Typography>
               <Typography variant="caption" color="text.secondary">
                 ({cat.nameEn}) · {cat.id}
               </Typography>
@@ -206,8 +206,8 @@ function OverrideField({
             ? `Đang dùng ảnh Pancake (${pancakeImages.length} ảnh)`
             : 'Không có ảnh từ Pancake'
         }
-        InputProps={
-          value
+        slotProps={{
+          input: value
             ? {
                 endAdornment: (
                   <InputAdornment position="end">
@@ -215,8 +215,8 @@ function OverrideField({
                   </InputAdornment>
                 ),
               }
-            : undefined
-        }
+            : {},
+        }}
       />
       {activeImage && <ImagePreview src={activeImage} />}
     </Box>
@@ -293,12 +293,14 @@ function ProductImagesTab({
         onChange={(e) => handleSearchChange(e.target.value)}
         fullWidth
         size="small"
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon fontSize="small" />
-            </InputAdornment>
-          ),
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
         }}
       />
 
@@ -322,7 +324,7 @@ function ProductImagesTab({
                 />
               )}
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body2" fontWeight={600} noWrap>{product.name}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{product.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
                   ID: {product.id} · {product.variants.length} biến thể
                   {getProductOverride(product.id) && (
@@ -337,7 +339,7 @@ function ProductImagesTab({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {/* Product-level image override */}
               <Box>
-                <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                   ẢNH SẢN PHẨM (CHÍNH)
                 </Typography>
                 <OverrideField
@@ -351,13 +353,13 @@ function ProductImagesTab({
               {/* Variant overrides */}
               {product.variants.length > 0 && (
                 <Box>
-                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                     ẢNH BIẾN THỂ
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {product.variants.map((variant) => (
                       <Card key={variant.id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
                           {variant.name || variant.fields.map((f) => `${f.name}: ${f.value}`).join(' · ') || variant.id}
                           {getVariantOverride(variant.id) && (
                             <Chip label="Override" size="small" color="primary" sx={{ ml: 1, height: 16, fontSize: 10 }} />
