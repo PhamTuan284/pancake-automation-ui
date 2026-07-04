@@ -400,6 +400,26 @@ a.excel-template-link,
   margin-top: 4px;
 }
 
+.meit-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meit-variant-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meit-variant-label {
+  font-size: 13px;
+  color: #94a3b8;
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
 .status-e2e {
   margin-top: 16px;
 }

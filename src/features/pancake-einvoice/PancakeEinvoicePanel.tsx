@@ -304,13 +304,15 @@ export function PancakeEinvoicePanel({
     }
   };
 
-  const runE2eTests = async (meitVariant?: 'mode' | 'daily') => {
-    const runLabel =
+  const runE2eTests = async (meitVariant?: 'mode' | 'daily', invoiceMode?: 'offsite' | 'onsite') => {
+    const modeLabel = invoiceMode === 'onsite' ? 'trên sàn' : 'ngoài sàn';
+    const variantLabel =
       shopKey === 'meit'
         ? meitVariant === 'daily'
           ? 'MeiT Daily'
           : 'MeiT Mode'
         : shopLabel;
+    const runLabel = shopKey === 'meit' ? `${variantLabel} · ${modeLabel}` : shopLabel;
     setE2eStatus('đang chạy');
     setE2eMessage('');
     try {
@@ -321,6 +323,7 @@ export function PancakeEinvoicePanel({
           spec: UI_WDIO_SINGLE_SPEC,
           shop: shopKey,
           saveMode,
+          invoiceMode: invoiceMode ?? 'offsite',
           ...(shopKey === 'meit' && meitVariant
             ? { meitVariant }
             : shopKey === 'meit'
@@ -395,14 +398,14 @@ export function PancakeEinvoicePanel({
         {shopKey === 'meit' ? (
           <>
             <a href={meitModeInvoiceUrl} target="_blank" rel="noreferrer">
-              MeiT Mode
+              Pancake MeiT Mode
             </a>
             {meitDailyInvoiceUrl ? (
               <>
                 {' '}
                 ·{' '}
                 <a href={meitDailyInvoiceUrl} target="_blank" rel="noreferrer">
-                  MeiT Daily
+                  Pancake MeiT Daily
                 </a>
               </>
             ) : null}
@@ -444,29 +447,32 @@ export function PancakeEinvoicePanel({
         </div>
         <div className="run-automation-actions">
           {shopKey === 'meit' ? (
-            <>
-              <UiButton
-                onClick={() => void runE2eTests('mode')}
-                disabled={e2eStatus === 'đang chạy'}
-              >
-                {e2eStatus === 'đang chạy'
-                  ? 'Đang chạy…'
-                  : 'Bắt đầu · MeiT Mode'}
-              </UiButton>
-              <UiButton
-                onClick={() => void runE2eTests('daily')}
-                disabled={e2eStatus === 'đang chạy' || !meitDailyConfigured}
-                title={
-                  meitDailyConfigured
-                    ? undefined
-                    : 'Cần PANCAKE_MEIT_DAILY_SHOP_ID trên server'
-                }
-              >
-                {e2eStatus === 'đang chạy'
-                  ? 'Đang chạy…'
-                  : 'Bắt đầu · MeiT Daily'}
-              </UiButton>
-            </>
+            <div className="meit-variants">
+              {(
+                [
+                  { variant: 'mode' as const, label: 'Pancake MeiT Mode', disabled: false },
+                  { variant: 'daily' as const, label: 'Pancake MeiT Daily', disabled: !meitDailyConfigured },
+                ] as const
+              ).map(({ variant, label, disabled }) => (
+                <div key={variant} className="meit-variant-row">
+                  <span className="meit-variant-label">{label}</span>
+                  <UiButton
+                    onClick={() => void runE2eTests(variant, 'offsite')}
+                    disabled={e2eStatus === 'đang chạy' || disabled}
+                    title={disabled ? 'Cần PANCAKE_MEIT_DAILY_SHOP_ID trên server' : undefined}
+                  >
+                    {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Xuất hóa đơn ngoài sàn TMĐT'}
+                  </UiButton>
+                  <UiButton
+                    onClick={() => void runE2eTests(variant, 'onsite')}
+                    disabled={e2eStatus === 'đang chạy' || disabled}
+                    title={disabled ? 'Cần PANCAKE_MEIT_DAILY_SHOP_ID trên server' : undefined}
+                  >
+                    {e2eStatus === 'đang chạy' ? 'Đang chạy…' : 'Xuất hóa đơn trên sàn TMĐT'}
+                  </UiButton>
+                </div>
+              ))}
+            </div>
           ) : (
             <UiButton
               onClick={() => void runE2eTests()}
