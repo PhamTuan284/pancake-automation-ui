@@ -21,6 +21,11 @@ export const TOOLS: ToolDef[] = [
       'Tính lương nhân viên theo công, OT, phụ cấp, khấu trừ và thuế TNCN.',
   },
   {
+    id: 'leave',
+    label: 'HRM · Nghỉ phép',
+    description: 'Ghi nhận và theo dõi lịch sử nghỉ phép có lương của nhân viên nội bộ.',
+  },
+  {
     id: 'telegram-bot',
     label: 'Telegram · Bot',
     description:

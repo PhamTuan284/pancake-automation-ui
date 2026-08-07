@@ -118,6 +118,31 @@ export type SalaryInputDraft = {
   dependentDeductionPerPerson: number;
 };
 
+export type LeaveInputDraft = {
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+};
+
+export type LeaveRecord = {
+  _id: string;
+  username: string;
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+  createdAt: string;
+};
+
+export type LeaveBalance = {
+  username: string;
+  paidLeaveTotal: number;
+  usedDays: number;
+  remainingDays: number;
+};
+
 export type SalaryResult = {
   employeeName: string;
   baseSalary: number;

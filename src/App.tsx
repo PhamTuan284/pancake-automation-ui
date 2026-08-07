@@ -10,6 +10,7 @@ import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
 import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
 import { SalaryPanel } from './features/salary/SalaryPanel';
+import { LeavePanel } from './features/leave/LeavePanel';
 import { TelegramBotPanel } from './features/telegram-bot/TelegramBotPanel';
 import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
@@ -161,6 +162,10 @@ function AppInner() {
 
         {activeToolId === 'salary-calc' && (
           <SalaryPanel toolDescription={activeTool?.description ?? ''} />
+        )}
+
+        {activeToolId === 'leave' && (
+          <LeavePanel toolDescription={activeTool?.description ?? ''} />
         )}
 
         {activeToolId === 'telegram-bot' && (

@@ -31,6 +31,7 @@ type UserRow = {
   username: string;
   role: 'admin' | 'user';
   isActive: boolean;
+  paidLeaveTotal: number;
   createdAt: string;
 };
 
@@ -43,9 +44,10 @@ type FormState = {
   username: string;
   password: string;
   role: 'admin' | 'user';
+  paidLeaveTotal: string;
 };
 
-const EMPTY_FORM: FormState = { username: '', password: '', role: 'user' };
+const EMPTY_FORM: FormState = { username: '', password: '', role: 'user', paidLeaveTotal: '12' };
 
 export function UserManagement({ token, currentUsername }: Props) {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -84,7 +86,12 @@ export function UserManagement({ token, currentUsername }: Props) {
 
   function openEdit(user: UserRow) {
     setEditTarget(user);
-    setForm({ username: user.username, password: '', role: user.role });
+    setForm({
+      username: user.username,
+      password: '',
+      role: user.role,
+      paidLeaveTotal: String(user.paidLeaveTotal ?? 12),
+    });
     setFormError(null);
     setDialogOpen(true);
   }
@@ -104,6 +111,10 @@ export function UserManagement({ token, currentUsername }: Props) {
       if (editTarget) {
         const body: Record<string, unknown> = { role: form.role };
         if (form.password) body.password = form.password;
+        const paidLeaveTotal = Number(form.paidLeaveTotal);
+        if (Number.isFinite(paidLeaveTotal) && paidLeaveTotal >= 0) {
+          body.paidLeaveTotal = paidLeaveTotal;
+        }
         const res = await fetch(apiUrl(`/admin/users/${editTarget._id}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', ...authHeader },
@@ -166,6 +177,7 @@ export function UserManagement({ token, currentUsername }: Props) {
               <TableCell>Tên đăng nhập</TableCell>
               <TableCell>Vai trò</TableCell>
               <TableCell>Trạng thái</TableCell>
+              <TableCell>Tổng phép năm</TableCell>
               <TableCell>Ngày tạo</TableCell>
               <TableCell align="right">Thao tác</TableCell>
             </TableRow>
@@ -189,6 +201,7 @@ export function UserManagement({ token, currentUsername }: Props) {
                     variant="outlined"
                   />
                 </TableCell>
+                <TableCell>{u.paidLeaveTotal ?? 12}</TableCell>
                 <TableCell>
                   {new Date(u.createdAt).toLocaleDateString('vi-VN')}
                 </TableCell>
@@ -241,6 +254,17 @@ export function UserManagement({ token, currentUsername }: Props) {
               <MenuItem value="admin">Admin</MenuItem>
             </Select>
           </FormControl>
+          {editTarget && (
+            <TextField
+              label="Tổng phép năm (ngày)"
+              type="number"
+              value={form.paidLeaveTotal}
+              onChange={(e) => setForm((f) => ({ ...f, paidLeaveTotal: e.target.value }))}
+              fullWidth
+              size="small"
+              slotProps={{ htmlInput: { min: 0 } }}
+            />
+          )}
           {formError && <Alert severity="error">{formError}</Alert>}
         </DialogContent>
         <DialogActions>
