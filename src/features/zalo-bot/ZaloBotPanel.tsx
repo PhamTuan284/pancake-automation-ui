@@ -33,6 +33,40 @@ type AbnormalOrderConfig = {
   thresholdPct: number;
 };
 
+type ProductPriceConfig = {
+  productCode: string;
+  costPrice: number;
+  offPlatformPrice: number;
+  platformPrice: number;
+  wholesalePrice: number;
+};
+
+type ProductPriceRow = {
+  productCode: string;
+  costPrice: string;
+  offPlatformPrice: string;
+  platformPrice: string;
+  wholesalePrice: string;
+};
+
+const EMPTY_PRICE_ROW: ProductPriceRow = {
+  productCode: '',
+  costPrice: '',
+  offPlatformPrice: '',
+  platformPrice: '',
+  wholesalePrice: '',
+};
+
+function toPriceRow(cfg: ProductPriceConfig): ProductPriceRow {
+  return {
+    productCode: cfg.productCode,
+    costPrice: String(cfg.costPrice || ''),
+    offPlatformPrice: String(cfg.offPlatformPrice || ''),
+    platformPrice: String(cfg.platformPrice || ''),
+    wholesalePrice: String(cfg.wholesalePrice || ''),
+  };
+}
+
 const KIND_LABEL: Record<ZaloLog['kind'], string> = {
   test: 'Test',
   report: 'Báo cáo',
@@ -73,6 +107,11 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [mockMessage, setMockMessage] = useState('');
   const [mockError, setMockError] = useState('');
 
+  const [priceRows, setPriceRows] = useState<ProductPriceRow[]>([]);
+  const [newPriceRow, setNewPriceRow] = useState<ProductPriceRow>(EMPTY_PRICE_ROW);
+  const [priceRowBusy, setPriceRowBusy] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState('');
+
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
     setConfigError('');
@@ -111,11 +150,20 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     } catch { /* ignore */ }
   }, []);
 
+  const loadPriceConfigs = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/product-price-config'));
+      const data = (await res.json().catch(() => ({}))) as { configs?: ProductPriceConfig[] };
+      setPriceRows((data.configs ?? []).map(toPriceRow));
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     void loadConfig();
     void loadLogs();
     void loadAbnormalConfig();
-  }, [loadConfig, loadLogs, loadAbnormalConfig]);
+    void loadPriceConfigs();
+  }, [loadConfig, loadLogs, loadAbnormalConfig, loadPriceConfigs]);
 
   async function handleSetWebhook() {
     setWebhookBusy(true);
@@ -229,6 +277,57 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     } finally {
       setMockBusy(false);
       void loadLogs();
+    }
+  }
+
+  function updatePriceRow(productCode: string, field: keyof ProductPriceRow, value: string) {
+    setPriceRows((rows) =>
+      rows.map((row) => (row.productCode === productCode ? { ...row, [field]: value } : row))
+    );
+  }
+
+  async function handleSavePriceRow(row: ProductPriceRow) {
+    const productCode = row.productCode.trim();
+    if (!productCode) return;
+    setPriceRowBusy(productCode);
+    setPriceError('');
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/product-price-config'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productCode,
+          costPrice: Number(row.costPrice) || 0,
+          offPlatformPrice: Number(row.offPlatformPrice) || 0,
+          platformPrice: Number(row.platformPrice) || 0,
+          wholesalePrice: Number(row.wholesalePrice) || 0,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Lưu thất bại');
+      setNewPriceRow(EMPTY_PRICE_ROW);
+      void loadPriceConfigs();
+    } catch (err) {
+      setPriceError(err instanceof Error ? err.message : 'Lưu thất bại.');
+    } finally {
+      setPriceRowBusy(null);
+    }
+  }
+
+  async function handleDeletePriceRow(productCode: string) {
+    setPriceRowBusy(productCode);
+    setPriceError('');
+    try {
+      const res = await fetch(apiUrl(`/zalo-bot/product-price-config/${encodeURIComponent(productCode)}`), {
+        method: 'DELETE',
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Xóa thất bại');
+      setPriceRows((rows) => rows.filter((row) => row.productCode !== productCode));
+    } catch (err) {
+      setPriceError(err instanceof Error ? err.message : 'Xóa thất bại.');
+    } finally {
+      setPriceRowBusy(null);
     }
   }
 
@@ -453,6 +552,133 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
         {saveError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{saveError}</p>}
         {mockMessage && <p className="hint hint-ok" style={{ marginTop: '0.5rem' }}>{mockMessage}</p>}
         {mockError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{mockError}</p>}
+      </section>
+
+      <section className="card" aria-labelledby="zalo-price-title">
+        <h2 id="zalo-price-title" className="section-title">Bảng giá sản phẩm</h2>
+        <p className="muted small">
+          Nhập giá theo mã sản phẩm (áp dụng cho mọi biến thể màu/size). Bot sẽ cảnh báo khi{' '}
+          <strong>doanh thu nhận về &lt; giá nhập</strong>, đơn trên sàn (Shopee, Tiktok){' '}
+          <strong>bán dưới giá bán trên sàn</strong>, đơn ngoài sàn (Zalo, Facebook){' '}
+          <strong>bán dưới giá bán ngoài sàn</strong>, và đơn sỉ <strong>bán dưới giá bán sỉ</strong>.
+        </p>
+
+        <div style={{ overflowX: 'auto', marginTop: '0.75rem' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '720px' }}>
+            <thead>
+              <tr>
+                {['Mã sản phẩm', 'Giá nhập', 'Giá ngoài sàn', 'Giá trên sàn', 'Giá sỉ', ''].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: 'left',
+                      padding: '4px 8px',
+                      borderBottom: '1px solid var(--color-border, #444)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {priceRows.map((row) => (
+                <tr key={row.productCode}>
+                  <td style={{ padding: '4px 8px' }}>{row.productCode}</td>
+                  {(['costPrice', 'offPlatformPrice', 'platformPrice', 'wholesalePrice'] as const).map((field) => (
+                    <td key={field} style={{ padding: '4px 8px' }}>
+                      <input
+                        type="number"
+                        min={0}
+                        value={row[field]}
+                        onChange={(e) => updatePriceRow(row.productCode, field, e.target.value)}
+                        style={{
+                          width: '110px',
+                          padding: '0 6px',
+                          height: '30px',
+                          border: '1px solid var(--color-border, #444)',
+                          borderRadius: '4px',
+                          background: 'var(--bg-page, #1e1e1e)',
+                          color: 'var(--text-primary, #fff)',
+                          fontSize: '13px',
+                        }}
+                      />
+                    </td>
+                  ))}
+                  <td style={{ padding: '4px 8px', display: 'flex', gap: '0.4rem' }}>
+                    <UiButton
+                      variant="secondary"
+                      onClick={() => void handleSavePriceRow(row)}
+                      disabled={priceRowBusy === row.productCode}
+                      style={{ width: 'auto' }}
+                    >
+                      Lưu
+                    </UiButton>
+                    <UiButton
+                      variant="secondary"
+                      onClick={() => void handleDeletePriceRow(row.productCode)}
+                      disabled={priceRowBusy === row.productCode}
+                      style={{ width: 'auto' }}
+                    >
+                      Xóa
+                    </UiButton>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td style={{ padding: '4px 8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Mã SP (vd A0385)"
+                    value={newPriceRow.productCode}
+                    onChange={(e) => setNewPriceRow((r) => ({ ...r, productCode: e.target.value }))}
+                    style={{
+                      width: '130px',
+                      padding: '0 6px',
+                      height: '30px',
+                      border: '1px solid var(--color-border, #444)',
+                      borderRadius: '4px',
+                      background: 'var(--bg-page, #1e1e1e)',
+                      color: 'var(--text-primary, #fff)',
+                      fontSize: '13px',
+                    }}
+                  />
+                </td>
+                {(['costPrice', 'offPlatformPrice', 'platformPrice', 'wholesalePrice'] as const).map((field) => (
+                  <td key={field} style={{ padding: '4px 8px' }}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={newPriceRow[field]}
+                      onChange={(e) => setNewPriceRow((r) => ({ ...r, [field]: e.target.value }))}
+                      style={{
+                        width: '110px',
+                        padding: '0 6px',
+                        height: '30px',
+                        border: '1px solid var(--color-border, #444)',
+                        borderRadius: '4px',
+                        background: 'var(--bg-page, #1e1e1e)',
+                        color: 'var(--text-primary, #fff)',
+                        fontSize: '13px',
+                      }}
+                    />
+                  </td>
+                ))}
+                <td style={{ padding: '4px 8px' }}>
+                  <UiButton
+                    onClick={() => void handleSavePriceRow(newPriceRow)}
+                    disabled={!newPriceRow.productCode.trim() || priceRowBusy === newPriceRow.productCode.trim()}
+                    style={{ width: 'auto' }}
+                  >
+                    Thêm
+                  </UiButton>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {priceError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{priceError}</p>}
       </section>
 
       <section className="card" aria-labelledby="zalo-logs-title">
