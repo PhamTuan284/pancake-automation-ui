@@ -118,8 +118,11 @@ export type SalaryInputDraft = {
   dependentDeductionPerPerson: number;
 };
 
+export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+
 export type LeaveInputDraft = {
   employeeName: string;
+  type: string;
   startDate: string;
   endDate: string;
   reason: string;
@@ -129,18 +132,30 @@ export type LeaveRecord = {
   _id: string;
   username: string;
   employeeName: string;
+  type: string;
   startDate: string;
   endDate: string;
   days: number;
   reason: string;
+  status: LeaveStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectReason?: string;
   createdAt: string;
+};
+
+export type LeaveTypeBalance = {
+  type: string;
+  label: string;
+  quota: number;
+  usedDays: number;
+  remainingDays: number;
 };
 
 export type LeaveBalance = {
   username: string;
-  paidLeaveTotal: number;
-  usedDays: number;
-  remainingDays: number;
+  department: string;
+  types: LeaveTypeBalance[];
 };
 
 export type SalaryResult = {

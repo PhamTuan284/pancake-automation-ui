@@ -13,24 +13,27 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Chip from '@mui/material/Chip';
 import { TOOLS } from '../../config/tools';
+import { DEPARTMENTS } from '../../config/departments';
 import { apiUrl } from '../../lib/api';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
 
 const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
-export type TabAccessLevel = 'guest' | 'user' | 'admin';
+/** Sentinel meaning "any logged-in user, regardless of department". */
+const ALL_VALUE = '*';
+const ALL_LABEL = 'Tất cả phòng ban';
 
-const ACCESS_OPTIONS: { value: TabAccessLevel; label: string }[] = [
-  { value: 'guest', label: 'Tất cả (không cần đăng nhập)' },
-  { value: 'user', label: 'Người dùng đã đăng nhập' },
-  { value: 'admin', label: 'Chỉ Admin' },
+const DEPARTMENT_OPTIONS: { value: string; label: string }[] = [
+  { value: ALL_VALUE, label: ALL_LABEL },
+  ...DEPARTMENTS.map((d) => ({ value: d, label: d })),
 ];
 
 type Props = {
   token: AuthUser['token'];
-  tabAccess: Record<string, TabAccessLevel>;
-  onSaved: (updated: Record<string, TabAccessLevel>) => void;
+  tabAccess: Record<string, string[]>;
+  onSaved: (updated: Record<string, string[]>) => void;
 };
 
 const ADMIN_TOOL_ID = 'admin';
@@ -39,16 +42,30 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
   const { logout } = useAuth();
   const configurableTools = TOOLS.filter((t) => t.id !== ADMIN_TOOL_ID);
 
-  const [access, setAccess] = useState<Record<string, TabAccessLevel>>(() => {
-    const init: Record<string, TabAccessLevel> = {};
+  const [access, setAccess] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {};
     for (const t of configurableTools) {
-      init[t.id] = tabAccess[t.id] ?? 'guest';
+      init[t.id] = tabAccess[t.id] ?? [];
     }
     return init;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  function handleChange(toolId: string, nextValues: string[]) {
+    setAccess((prev) => {
+      const prevValues = prev[toolId] ?? [];
+      let next = nextValues;
+      // Selecting "Tất cả phòng ban" clears specific departments and vice versa.
+      if (next.includes(ALL_VALUE) && !prevValues.includes(ALL_VALUE)) {
+        next = [ALL_VALUE];
+      } else if (next.length > 1 && next.includes(ALL_VALUE)) {
+        next = next.filter((v) => v !== ALL_VALUE);
+      }
+      return { ...prev, [toolId]: next };
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -67,7 +84,7 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
         logout(SESSION_EXPIRED_MESSAGE);
         return;
       }
-      const data = (await res.json()) as { tabAccess?: Record<string, TabAccessLevel>; error?: string };
+      const data = (await res.json()) as { tabAccess?: Record<string, string[]>; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Lưu thất bại.');
       onSaved(data.tabAccess ?? access);
       setSuccess(true);
@@ -84,7 +101,8 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
         Phân quyền truy cập Tab
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Chọn vai trò tối thiểu cần có để xem từng tab. Tab Admin luôn hiển thị với tất cả (nhưng yêu cầu đăng nhập bên trong).
+        Chọn phòng ban được phép xem từng tab. Tài khoản có vai trò Admin luôn xem được mọi tab.
+        Tab Admin chỉ dành cho vai trò Admin.
       </Typography>
       <Divider sx={{ mb: 2 }} />
 
@@ -92,7 +110,7 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Tab</TableCell>
-            <TableCell sx={{ fontWeight: 600, width: 280 }}>Vai trò được phép xem</TableCell>
+            <TableCell sx={{ fontWeight: 600, width: 360 }}>Phòng ban được phép xem</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -109,15 +127,28 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
               <TableCell>
                 <FormControl size="small" fullWidth>
                   <Select
-                    value={access[tool.id] ?? 'guest'}
-                    onChange={(e) =>
-                      setAccess((prev) => ({
-                        ...prev,
-                        [tool.id]: e.target.value as TabAccessLevel,
-                      }))
-                    }
+                    multiple
+                    displayEmpty
+                    value={access[tool.id] ?? []}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleChange(tool.id, typeof value === 'string' ? value.split(',') : value);
+                    }}
+                    renderValue={(selected) => {
+                      const values = selected as string[];
+                      if (values.length === 0) {
+                        return <Typography variant="body2" color="text.secondary">Chỉ Admin</Typography>;
+                      }
+                      return (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {values.map((v) => (
+                            <Chip key={v} label={v === ALL_VALUE ? ALL_LABEL : v} size="small" />
+                          ))}
+                        </Box>
+                      );
+                    }}
                   >
-                    {ACCESS_OPTIONS.map((opt) => (
+                    {DEPARTMENT_OPTIONS.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </MenuItem>

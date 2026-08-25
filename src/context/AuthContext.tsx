@@ -10,6 +10,8 @@ import { apiUrl } from '../lib/api';
 export type AuthUser = {
   username: string;
   role: 'admin' | 'user';
+  department: string;
+  gender?: 'male' | 'female';
   token: string;
 };
 
@@ -48,11 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = (await res.json()) as { token?: string; username?: string; role?: string; error?: string };
+    const data = (await res.json()) as {
+      token?: string;
+      username?: string;
+      role?: string;
+      department?: string;
+      gender?: string;
+      error?: string;
+    };
     if (!res.ok) throw new Error(data.error ?? 'Đăng nhập thất bại.');
     const authUser: AuthUser = {
       username: data.username!,
       role: data.role as AuthUser['role'],
+      department: data.department ?? '',
+      gender: data.gender === 'male' || data.gender === 'female' ? data.gender : undefined,
       token: data.token!,
     };
     setUser(authUser);

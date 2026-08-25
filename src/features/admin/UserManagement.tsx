@@ -25,6 +25,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { apiUrl } from '../../lib/api';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
+import { DEPARTMENTS } from '../../config/departments';
 
 const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
@@ -34,6 +35,9 @@ type UserRow = {
   role: 'admin' | 'user';
   isActive: boolean;
   paidLeaveTotal: number;
+  department: string;
+  hireDate?: string;
+  gender?: 'male' | 'female';
   createdAt: string;
 };
 
@@ -47,9 +51,20 @@ type FormState = {
   password: string;
   role: 'admin' | 'user';
   paidLeaveTotal: string;
+  department: string;
+  hireDate: string;
+  gender: '' | 'male' | 'female';
 };
 
-const EMPTY_FORM: FormState = { username: '', password: '', role: 'user', paidLeaveTotal: '12' };
+const EMPTY_FORM: FormState = {
+  username: '',
+  password: '',
+  role: 'user',
+  paidLeaveTotal: '12',
+  department: '',
+  hireDate: '',
+  gender: '',
+};
 
 export function UserManagement({ token, currentUsername }: Props) {
   const { logout } = useAuth();
@@ -98,6 +113,9 @@ export function UserManagement({ token, currentUsername }: Props) {
       password: '',
       role: user.role,
       paidLeaveTotal: String(user.paidLeaveTotal ?? 12),
+      department: user.department ?? '',
+      hireDate: user.hireDate ? user.hireDate.slice(0, 10) : '',
+      gender: user.gender ?? '',
     });
     setFormError(null);
     setDialogOpen(true);
@@ -116,7 +134,12 @@ export function UserManagement({ token, currentUsername }: Props) {
     setFormError(null);
     try {
       if (editTarget) {
-        const body: Record<string, unknown> = { role: form.role };
+        const body: Record<string, unknown> = {
+          role: form.role,
+          department: form.department,
+          hireDate: form.hireDate,
+          gender: form.gender,
+        };
         if (form.password) body.password = form.password;
         const paidLeaveTotal = Number(form.paidLeaveTotal);
         if (Number.isFinite(paidLeaveTotal) && paidLeaveTotal >= 0) {
@@ -195,6 +218,9 @@ export function UserManagement({ token, currentUsername }: Props) {
             <TableRow>
               <TableCell>Tên đăng nhập</TableCell>
               <TableCell>Vai trò</TableCell>
+              <TableCell>Phòng ban</TableCell>
+              <TableCell>Giới tính</TableCell>
+              <TableCell>Ngày vào làm</TableCell>
               <TableCell>Trạng thái</TableCell>
               <TableCell>Tổng phép năm</TableCell>
               <TableCell>Ngày tạo</TableCell>
@@ -212,6 +238,9 @@ export function UserManagement({ token, currentUsername }: Props) {
                     size="small"
                   />
                 </TableCell>
+                <TableCell>{u.department || '—'}</TableCell>
+                <TableCell>{u.gender === 'male' ? 'Nam' : u.gender === 'female' ? 'Nữ' : '—'}</TableCell>
+                <TableCell>{u.hireDate ? new Date(u.hireDate).toLocaleDateString('vi-VN') : '—'}</TableCell>
                 <TableCell>
                   <Chip
                     label={u.isActive ? 'Hoạt động' : 'Bị khóa'}
@@ -273,6 +302,40 @@ export function UserManagement({ token, currentUsername }: Props) {
               <MenuItem value="admin">Admin</MenuItem>
             </Select>
           </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Phòng ban</InputLabel>
+            <Select
+              label="Phòng ban"
+              value={form.department}
+              onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+            >
+              <MenuItem value="">— Không chọn —</MenuItem>
+              {DEPARTMENTS.map((dept) => (
+                <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Giới tính</InputLabel>
+            <Select
+              label="Giới tính"
+              value={form.gender}
+              onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value as FormState['gender'] }))}
+            >
+              <MenuItem value="">— Không chọn —</MenuItem>
+              <MenuItem value="male">Nam</MenuItem>
+              <MenuItem value="female">Nữ</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Ngày vào làm"
+            type="date"
+            value={form.hireDate}
+            onChange={(e) => setForm((f) => ({ ...f, hireDate: e.target.value }))}
+            fullWidth
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
           {editTarget && (
             <TextField
               label="Tổng phép năm (ngày)"

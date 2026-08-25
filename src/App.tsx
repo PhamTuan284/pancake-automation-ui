@@ -5,6 +5,8 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
+import Button from '@mui/material/Button';
 import { TOOLS } from './config/tools';
 import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
@@ -13,7 +15,7 @@ import { LeavePanel } from './features/leave/LeavePanel';
 import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
-import type { TabAccessLevel } from './features/admin/TabVisibilitySettings';
+import { LoginScreen } from './components/LoginScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiUrl } from './lib/api';
 
@@ -21,7 +23,7 @@ const TOOL_QUERY_PARAM = 'tool';
 const ADMIN_TOOL_ID = 'admin';
 
 type AdminSettings = {
-  tabAccess: Record<string, TabAccessLevel>;
+  tabAccess: Record<string, string[]>;
   botEnabled: { zalo: boolean };
 };
 
@@ -30,12 +32,22 @@ const DEFAULT_SETTINGS: AdminSettings = {
   botEnabled: { zalo: true },
 };
 
-const ROLE_LEVEL: Record<string, number> = { guest: 0, user: 1, admin: 2 };
-
-function canAccessTab(toolId: string, userRole: string, tabAccess: Record<string, TabAccessLevel>): boolean {
-  if (toolId === ADMIN_TOOL_ID) return true;
-  const required = tabAccess[toolId] ?? 'guest';
-  return (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[required] ?? 0);
+/**
+ * Every tool requires login. The `admin` tab is admin-role only; every other
+ * tab is admin-configurable per department (via TabVisibilitySettings) —
+ * `'*'` in the allow-list means any logged-in user, an empty/missing list
+ * means admin-only. `role: 'admin'` users always bypass this check.
+ */
+function canAccessTab(
+  toolId: string,
+  role: 'admin' | 'user',
+  department: string,
+  tabAccess: Record<string, string[]>
+): boolean {
+  if (toolId === ADMIN_TOOL_ID) return role === 'admin';
+  if (role === 'admin') return true;
+  const allowed = tabAccess[toolId] ?? [];
+  return allowed.includes('*') || allowed.includes(department);
 }
 
 function readToolIdFromUrl(enabledIds: Set<string>): string | null {
@@ -53,8 +65,9 @@ function urlWithToolQuery(toolId: string): string {
 }
 
 function AppInner() {
-  const { user } = useAuth();
-  const userRole = user?.role ?? 'guest';
+  const { user, logout } = useAuth();
+  const userRole = user?.role ?? 'user';
+  const userDepartment = user?.department ?? '';
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
 
@@ -70,8 +83,8 @@ function AppInner() {
   }
 
   const visibleTools = useMemo(
-    () => TOOLS.filter((t) => canAccessTab(t.id, userRole, adminSettings.tabAccess)),
-    [userRole, adminSettings.tabAccess]
+    () => (user ? TOOLS.filter((t) => canAccessTab(t.id, userRole, userDepartment, adminSettings.tabAccess)) : []),
+    [user, userRole, userDepartment, adminSettings.tabAccess]
   );
 
   const enabledToolIds = useMemo(
@@ -93,6 +106,14 @@ function AppInner() {
     [activeToolId, visibleTools]
   );
 
+  // Resync when the current tab becomes invalid — e.g. right after login
+  // (activeToolId was initialized while logged out, so defaultToolId was
+  // still ''), after logout, or when permissions change.
+  useEffect(() => {
+    if (activeToolId && enabledToolIds.has(activeToolId)) return;
+    setActiveToolId(readToolIdFromUrl(enabledToolIds) ?? defaultToolId);
+  }, [activeToolId, enabledToolIds, defaultToolId]);
+
   useEffect(() => {
     const onPopState = () => {
       setActiveToolId(readToolIdFromUrl(enabledToolIds) ?? defaultToolId);
@@ -107,6 +128,14 @@ function AppInner() {
     window.history.pushState({}, '', urlWithToolQuery(activeToolId));
   }, [activeToolId, enabledToolIds]);
 
+  if (!user) {
+    return (
+      <div className="page">
+        <LoginScreen />
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <AppBar position="static" className="app-navbar" elevation={0}>
@@ -115,10 +144,16 @@ function AppInner() {
             variant="h5"
             component="h1"
             className="app-navbar-title"
-            sx={{ width: '100%', textAlign: 'center' }}
+            sx={{ flex: 1, textAlign: 'center' }}
           >
             MeiT Tools
           </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip label={user.username} size="small" color={user.role === 'admin' ? 'primary' : 'default'} />
+            <Button size="small" variant="outlined" color="inherit" onClick={() => logout()}>
+              Đăng xuất
+            </Button>
+          </Box>
         </Toolbar>
         <Box className="app-navbar-tabs-wrap">
           <Tabs
