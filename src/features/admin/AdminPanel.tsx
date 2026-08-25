@@ -17,7 +17,7 @@ import { UserManagement } from './UserManagement';
 
 type AdminSettings = {
   tabAccess: Record<string, TabAccessLevel>;
-  botEnabled: { telegram: boolean; zalo: boolean };
+  botEnabled: { zalo: boolean };
 };
 
 type Props = {

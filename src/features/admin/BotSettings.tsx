@@ -10,7 +10,7 @@ import Divider from '@mui/material/Divider';
 import { apiUrl } from '../../lib/api';
 import type { AuthUser } from '../../context/AuthContext';
 
-type BotEnabled = { telegram: boolean; zalo: boolean };
+type BotEnabled = { zalo: boolean };
 
 type Props = {
   token: AuthUser['token'];
@@ -58,16 +58,6 @@ export function BotSettings({ token, botEnabled, onSaved }: Props) {
       </Typography>
       <Divider sx={{ mb: 2 }} />
 
-      <FormControlLabel
-        sx={{ display: 'flex', mb: 1 }}
-        control={
-          <Switch
-            checked={enabled.telegram}
-            onChange={(e) => setEnabled((prev) => ({ ...prev, telegram: e.target.checked }))}
-          />
-        }
-        label="Telegram Bot – Báo cáo biến thể bán chạy"
-      />
       <FormControlLabel
         sx={{ display: 'flex', mb: 1 }}
         control={

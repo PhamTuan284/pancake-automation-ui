@@ -15,21 +15,9 @@ export const TOOLS: ToolDef[] = [
       'Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API.',
   },
   {
-    id: 'salary-calc',
-    label: 'HRM · Tính lương',
-    description:
-      'Tính lương nhân viên theo công, OT, phụ cấp, khấu trừ và thuế TNCN.',
-  },
-  {
     id: 'leave',
     label: 'HRM · Nghỉ phép',
     description: 'Ghi nhận và theo dõi lịch sử nghỉ phép có lương của nhân viên nội bộ.',
-  },
-  {
-    id: 'telegram-bot',
-    label: 'Telegram · Bot',
-    description:
-      'Gửi báo cáo biến thể bán chạy từ Pancake Webhook lên Telegram tự động mỗi ngày.',
   },
   {
     id: 'zalo-bot',

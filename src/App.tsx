@@ -9,9 +9,7 @@ import { TOOLS } from './config/tools';
 import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
 import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
-import { SalaryPanel } from './features/salary/SalaryPanel';
 import { LeavePanel } from './features/leave/LeavePanel';
-import { TelegramBotPanel } from './features/telegram-bot/TelegramBotPanel';
 import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
@@ -24,12 +22,12 @@ const ADMIN_TOOL_ID = 'admin';
 
 type AdminSettings = {
   tabAccess: Record<string, TabAccessLevel>;
-  botEnabled: { telegram: boolean; zalo: boolean };
+  botEnabled: { zalo: boolean };
 };
 
 const DEFAULT_SETTINGS: AdminSettings = {
   tabAccess: {},
-  botEnabled: { telegram: true, zalo: true },
+  botEnabled: { zalo: true },
 };
 
 const ROLE_LEVEL: Record<string, number> = { guest: 0, user: 1, admin: 2 };
@@ -160,16 +158,8 @@ function AppInner() {
           <PancakeWebhookPanel toolDescription={activeTool?.description ?? ''} />
         )}
 
-        {activeToolId === 'salary-calc' && (
-          <SalaryPanel toolDescription={activeTool?.description ?? ''} />
-        )}
-
         {activeToolId === 'leave' && (
           <LeavePanel toolDescription={activeTool?.description ?? ''} />
-        )}
-
-        {activeToolId === 'telegram-bot' && (
-          <TelegramBotPanel toolDescription={activeTool?.description ?? ''} />
         )}
 
         {activeToolId === 'zalo-bot' && (
