@@ -15,7 +15,9 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import { TOOLS } from '../../config/tools';
 import { apiUrl } from '../../lib/api';
-import type { AuthUser } from '../../context/AuthContext';
+import { useAuth, type AuthUser } from '../../context/AuthContext';
+
+const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 export type TabAccessLevel = 'guest' | 'user' | 'admin';
 
@@ -34,6 +36,7 @@ type Props = {
 const ADMIN_TOOL_ID = 'admin';
 
 export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
+  const { logout } = useAuth();
   const configurableTools = TOOLS.filter((t) => t.id !== ADMIN_TOOL_ID);
 
   const [access, setAccess] = useState<Record<string, TabAccessLevel>>(() => {
@@ -60,6 +63,10 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
         },
         body: JSON.stringify({ tabAccess: access }),
       });
+      if (res.status === 401) {
+        logout(SESSION_EXPIRED_MESSAGE);
+        return;
+      }
       const data = (await res.json()) as { tabAccess?: Record<string, TabAccessLevel>; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Lưu thất bại.');
       onSaved(data.tabAccess ?? access);

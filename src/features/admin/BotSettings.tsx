@@ -8,7 +8,9 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import { apiUrl } from '../../lib/api';
-import type { AuthUser } from '../../context/AuthContext';
+import { useAuth, type AuthUser } from '../../context/AuthContext';
+
+const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 type BotEnabled = { zalo: boolean };
 
@@ -19,6 +21,7 @@ type Props = {
 };
 
 export function BotSettings({ token, botEnabled, onSaved }: Props) {
+  const { logout } = useAuth();
   const [enabled, setEnabled] = useState<BotEnabled>(botEnabled);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,10 @@ export function BotSettings({ token, botEnabled, onSaved }: Props) {
         },
         body: JSON.stringify({ botEnabled: enabled }),
       });
+      if (res.status === 401) {
+        logout(SESSION_EXPIRED_MESSAGE);
+        return;
+      }
       const data = (await res.json()) as { botEnabled?: BotEnabled; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Lưu thất bại.');
       onSaved(data.botEnabled ?? enabled);

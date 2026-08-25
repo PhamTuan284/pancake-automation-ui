@@ -24,7 +24,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { apiUrl } from '../../lib/api';
-import type { AuthUser } from '../../context/AuthContext';
+import { useAuth, type AuthUser } from '../../context/AuthContext';
+
+const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 type UserRow = {
   _id: string;
@@ -50,6 +52,7 @@ type FormState = {
 const EMPTY_FORM: FormState = { username: '', password: '', role: 'user', paidLeaveTotal: '12' };
 
 export function UserManagement({ token, currentUsername }: Props) {
+  const { logout } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +69,10 @@ export function UserManagement({ token, currentUsername }: Props) {
     setError(null);
     try {
       const res = await fetch(apiUrl('/admin/users'), { headers: authHeader });
+      if (res.status === 401) {
+        logout(SESSION_EXPIRED_MESSAGE);
+        return;
+      }
       if (!res.ok) throw new Error('Không thể tải danh sách người dùng.');
       setUsers(await res.json() as UserRow[]);
     } catch (err) {
@@ -73,7 +80,7 @@ export function UserManagement({ token, currentUsername }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, logout]);
 
   useEffect(() => { void fetchUsers(); }, [fetchUsers]);
 
@@ -120,6 +127,10 @@ export function UserManagement({ token, currentUsername }: Props) {
           headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify(body),
         });
+        if (res.status === 401) {
+          logout(SESSION_EXPIRED_MESSAGE);
+          return;
+        }
         const data = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(data.error ?? 'Cập nhật thất bại.');
       } else {
@@ -128,6 +139,10 @@ export function UserManagement({ token, currentUsername }: Props) {
           headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify(form),
         });
+        if (res.status === 401) {
+          logout(SESSION_EXPIRED_MESSAGE);
+          return;
+        }
         const data = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(data.error ?? 'Tạo người dùng thất bại.');
       }
@@ -147,6 +162,10 @@ export function UserManagement({ token, currentUsername }: Props) {
         method: 'DELETE',
         headers: authHeader,
       });
+      if (res.status === 401) {
+        logout(SESSION_EXPIRED_MESSAGE);
+        return;
+      }
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Xóa thất bại.');
       await fetchUsers();

@@ -26,7 +26,7 @@ type Props = {
 };
 
 function LoginForm() {
-  const { login } = useAuth();
+  const { login, authMessage } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,6 +61,7 @@ function LoginForm() {
       <Typography variant="h5" sx={{ textAlign: 'center' }} gutterBottom>
         Đăng nhập Admin
       </Typography>
+      {authMessage && <Alert severity="info">{authMessage}</Alert>}
       <TextField
         label="Tên đăng nhập"
         value={username}
@@ -109,7 +110,7 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
             variant="outlined"
             color="inherit"
             startIcon={<LogoutIcon />}
-            onClick={logout}
+            onClick={() => logout()}
           >
             Đăng xuất
           </Button>

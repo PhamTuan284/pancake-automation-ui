@@ -15,12 +15,14 @@ export type AuthUser = {
 
 type AuthContextType = {
   user: AuthUser | null;
+  authMessage: string | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: (reason?: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  authMessage: null,
   login: async () => {},
   logout: () => {},
 });
@@ -38,6 +40,7 @@ function loadStoredUser(): AuthUser | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await fetch(apiUrl('/admin/login'), {
@@ -53,16 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: data.token!,
     };
     setUser(authUser);
+    setAuthMessage(null);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback((reason?: string) => {
     setUser(null);
+    setAuthMessage(reason ?? null);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, authMessage, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
