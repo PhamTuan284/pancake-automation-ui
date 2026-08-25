@@ -10,11 +10,17 @@ function todayIso(): string {
 }
 
 const EMPTY_DRAFT: LeaveInputDraft = {
-  employeeName: '',
   type: 'annual',
   startDate: todayIso(),
   endDate: todayIso(),
+  session: 'full',
   reason: '',
+};
+
+const SESSION_LABEL: Record<LeaveInputDraft['session'], string> = {
+  full: 'Cả ngày',
+  morning: 'Nửa ngày (buổi sáng)',
+  afternoon: 'Nửa ngày (buổi chiều)',
 };
 
 function formatDate(value: string): string {
@@ -36,6 +42,12 @@ function statusClass(status: LeaveStatus): string {
 
 function typeLabel(type: string): string {
   return LEAVE_TYPE_LABEL[type as keyof typeof LEAVE_TYPE_LABEL] ?? type;
+}
+
+function daysLabel(r: LeaveRecord): string {
+  if (r.session === 'morning') return `${r.days} (sáng)`;
+  if (r.session === 'afternoon') return `${r.days} (chiều)`;
+  return String(r.days);
 }
 
 function availableLeaveTypes(gender: 'male' | 'female' | undefined) {
@@ -124,9 +136,18 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.token, isAdmin]);
 
-  const updateField = (key: keyof LeaveInputDraft, value: string) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+  const updateField = (key: 'type' | 'startDate' | 'endDate' | 'reason', value: string) => {
+    setDraft((prev) => {
+      const next = { ...prev, [key]: value };
+      // Half-day only makes sense for a single-day request.
+      if ((key === 'startDate' || key === 'endDate') && next.startDate !== next.endDate) {
+        next.session = 'full';
+      }
+      return next;
+    });
   };
+
+  const isSingleDay = draft.startDate === draft.endDate;
 
   const refreshAll = async () => {
     await loadRecords();
@@ -148,7 +169,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || 'Không thể ghi nhận nghỉ phép.');
-      setDraft((prev) => ({ ...EMPTY_DRAFT, employeeName: prev.employeeName }));
+      setDraft(EMPTY_DRAFT);
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể ghi nhận nghỉ phép.');
@@ -208,9 +229,9 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
             <input
               type="text"
               className="search-input webhook-url-input"
-              value={draft.employeeName}
-              onChange={(e) => updateField('employeeName', e.target.value)}
-              placeholder={user?.username ?? 'Nguyễn Văn A'}
+              value={user?.fullName || user?.username || ''}
+              disabled
+              readOnly
             />
           </label>
           <label className="webhook-register-field">
@@ -242,6 +263,20 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               value={draft.endDate}
               onChange={(e) => updateField('endDate', e.target.value)}
             />
+          </label>
+          <label className="webhook-register-field">
+            <span>Buổi nghỉ</span>
+            <select
+              className="search-input webhook-url-input"
+              value={draft.session}
+              disabled={!isSingleDay}
+              onChange={(e) => setDraft((prev) => ({ ...prev, session: e.target.value as LeaveInputDraft['session'] }))}
+            >
+              {(Object.keys(SESSION_LABEL) as LeaveInputDraft['session'][]).map((s) => (
+                <option key={s} value={s}>{SESSION_LABEL[s]}</option>
+              ))}
+            </select>
+            {!isSingleDay && <span className="muted small">Chỉ chọn được nửa ngày khi nghỉ 1 ngày duy nhất.</span>}
           </label>
           <label className="webhook-register-field">
             <span>Lý do</span>
@@ -321,7 +356,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                     <td>{typeLabel(r.type)}</td>
                     <td>{formatDate(r.startDate)}</td>
                     <td>{formatDate(r.endDate)}</td>
-                    <td>{r.days}</td>
+                    <td>{daysLabel(r)}</td>
                     <td>{r.reason || '—'}</td>
                     <td style={{ display: 'flex', gap: 8 }}>
                       <UiButton

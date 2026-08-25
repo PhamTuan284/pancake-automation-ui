@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -23,15 +24,19 @@ import CircularProgress from '@mui/material/CircularProgress';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import SearchIcon from '@mui/icons-material/Search';
 import { apiUrl } from '../../lib/api';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
 import { DEPARTMENTS } from '../../config/departments';
+
+const ALL_VALUE = '__all__';
 
 const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 type UserRow = {
   _id: string;
   username: string;
+  fullName?: string;
   role: 'admin' | 'user';
   isActive: boolean;
   paidLeaveTotal: number;
@@ -49,6 +54,7 @@ type Props = {
 type FormState = {
   username: string;
   password: string;
+  fullName: string;
   role: 'admin' | 'user';
   paidLeaveTotal: string;
   department: string;
@@ -59,6 +65,7 @@ type FormState = {
 const EMPTY_FORM: FormState = {
   username: '',
   password: '',
+  fullName: '',
   role: 'user',
   paidLeaveTotal: '12',
   department: '',
@@ -77,7 +84,25 @@ export function UserManagement({ token, currentUsername }: Props) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState(ALL_VALUE);
+  const [roleFilter, setRoleFilter] = useState(ALL_VALUE);
+  const [statusFilter, setStatusFilter] = useState(ALL_VALUE);
+
   const authHeader = { Authorization: `Bearer ${token}` };
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (departmentFilter !== ALL_VALUE && u.department !== departmentFilter) return false;
+      if (roleFilter !== ALL_VALUE && u.role !== roleFilter) return false;
+      if (statusFilter !== ALL_VALUE && String(u.isActive) !== statusFilter) return false;
+      if (query && !u.username.toLowerCase().includes(query) && !(u.fullName ?? '').toLowerCase().includes(query)) {
+        return false;
+      }
+      return true;
+    });
+  }, [users, search, departmentFilter, roleFilter, statusFilter]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -111,6 +136,7 @@ export function UserManagement({ token, currentUsername }: Props) {
     setForm({
       username: user.username,
       password: '',
+      fullName: user.fullName ?? '',
       role: user.role,
       paidLeaveTotal: String(user.paidLeaveTotal ?? 12),
       department: user.department ?? '',
@@ -135,6 +161,7 @@ export function UserManagement({ token, currentUsername }: Props) {
     try {
       if (editTarget) {
         const body: Record<string, unknown> = {
+          fullName: form.fullName,
           role: form.role,
           department: form.department,
           hireDate: form.hireDate,
@@ -208,6 +235,62 @@ export function UserManagement({ token, currentUsername }: Props) {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
+        <TextField
+          size="small"
+          placeholder="Tìm theo tên đăng nhập hoặc họ tên…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ minWidth: 260, flex: 1 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Phòng ban</InputLabel>
+          <Select
+            label="Phòng ban"
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+          >
+            <MenuItem value={ALL_VALUE}>Tất cả phòng ban</MenuItem>
+            {DEPARTMENTS.map((dept) => (
+              <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Vai trò</InputLabel>
+          <Select
+            label="Vai trò"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            <MenuItem value={ALL_VALUE}>Tất cả vai trò</MenuItem>
+            <MenuItem value="user">User</MenuItem>
+            <MenuItem value="admin">Admin</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Trạng thái</InputLabel>
+          <Select
+            label="Trạng thái"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <MenuItem value={ALL_VALUE}>Tất cả trạng thái</MenuItem>
+            <MenuItem value="true">Hoạt động</MenuItem>
+            <MenuItem value="false">Bị khóa</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
@@ -217,6 +300,7 @@ export function UserManagement({ token, currentUsername }: Props) {
           <TableHead>
             <TableRow>
               <TableCell>Tên đăng nhập</TableCell>
+              <TableCell>Họ và tên</TableCell>
               <TableCell>Vai trò</TableCell>
               <TableCell>Phòng ban</TableCell>
               <TableCell>Giới tính</TableCell>
@@ -228,9 +312,19 @@ export function UserManagement({ token, currentUsername }: Props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((u) => (
+            {filteredUsers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={10}>
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                    Không tìm thấy người dùng phù hợp.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {filteredUsers.map((u) => (
               <TableRow key={u._id}>
                 <TableCell>{u.username}</TableCell>
+                <TableCell>{u.fullName || '—'}</TableCell>
                 <TableCell>
                   <Chip
                     label={u.role === 'admin' ? 'Admin' : 'User'}
@@ -280,6 +374,13 @@ export function UserManagement({ token, currentUsername }: Props) {
             value={form.username}
             onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
             disabled={!!editTarget}
+            fullWidth
+            size="small"
+          />
+          <TextField
+            label="Họ và tên"
+            value={form.fullName}
+            onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
             fullWidth
             size="small"
           />

@@ -149,7 +149,7 @@ function AppInner() {
             MeiT Tools
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip label={user.username} size="small" color={user.role === 'admin' ? 'primary' : 'default'} />
+            <Chip label={user.fullName || user.username} size="small" color={user.role === 'admin' ? 'primary' : 'default'} />
             <Button size="small" variant="outlined" color="inherit" onClick={() => logout()}>
               Đăng xuất
             </Button>

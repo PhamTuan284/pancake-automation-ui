@@ -119,12 +119,13 @@ export type SalaryInputDraft = {
 };
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+export type LeaveSession = 'full' | 'morning' | 'afternoon';
 
 export type LeaveInputDraft = {
-  employeeName: string;
   type: string;
   startDate: string;
   endDate: string;
+  session: LeaveSession;
   reason: string;
 };
 
@@ -135,6 +136,7 @@ export type LeaveRecord = {
   type: string;
   startDate: string;
   endDate: string;
+  session: LeaveSession;
   days: number;
   reason: string;
   status: LeaveStatus;

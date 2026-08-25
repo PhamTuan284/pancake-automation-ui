@@ -9,6 +9,7 @@ import { apiUrl } from '../lib/api';
 
 export type AuthUser = {
   username: string;
+  fullName: string;
   role: 'admin' | 'user';
   department: string;
   gender?: 'male' | 'female';
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = (await res.json()) as {
       token?: string;
       username?: string;
+      fullName?: string;
       role?: string;
       department?: string;
       gender?: string;
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(data.error ?? 'Đăng nhập thất bại.');
     const authUser: AuthUser = {
       username: data.username!,
+      fullName: data.fullName ?? '',
       role: data.role as AuthUser['role'],
       department: data.department ?? '',
       gender: data.gender === 'male' || data.gender === 'female' ? data.gender : undefined,
