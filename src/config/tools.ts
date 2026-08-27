@@ -16,7 +16,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'leave',
-    label: 'HRM · Nghỉ phép',
+    label: 'TMS · Nghỉ phép',
     description: 'Ghi nhận và theo dõi lịch sử nghỉ phép có lương của nhân viên nội bộ.',
   },
   {

@@ -133,6 +133,7 @@ export type LeaveRecord = {
   _id: string;
   username: string;
   employeeName: string;
+  department?: string;
   type: string;
   startDate: string;
   endDate: string;

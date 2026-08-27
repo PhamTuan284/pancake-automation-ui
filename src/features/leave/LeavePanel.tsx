@@ -50,6 +50,28 @@ function daysLabel(r: LeaveRecord): string {
   return String(r.days);
 }
 
+/**
+ * Calendar days from `startIso` to `endIso` inclusive, excluding Sundays —
+ * Sunday is already everyone's weekly day off, so it never counts against
+ * leave quota. Mirrors `countLeaveDays` in the server's `common/leaveTypes.ts`.
+ */
+function countLeaveDays(startIso: string, endIso: string): { days: number; hasSunday: boolean } {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return { days: 0, hasSunday: false };
+  }
+  let days = 0;
+  let hasSunday = false;
+  const cursor = new Date(start);
+  while (cursor.getTime() <= end.getTime()) {
+    if (cursor.getUTCDay() === 0) hasSunday = true;
+    else days += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return { days, hasSunday };
+}
+
 function availableLeaveTypes(gender: 'male' | 'female' | undefined) {
   return LEAVE_TYPES.filter((t) => {
     if (t.id === 'maternity') return gender === 'female';
@@ -151,6 +173,9 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
   };
 
   const isSingleDay = draft.startDate === draft.endDate;
+  const rangePreview = countLeaveDays(draft.startDate, draft.endDate);
+  const previewDays = draft.session === 'full' ? rangePreview.days : 0.5;
+  const includesSunday = draft.session === 'full' && rangePreview.hasSunday;
 
   const refreshAll = async () => {
     await loadRecords();
@@ -296,12 +321,20 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
           </label>
         </div>
 
+        <p className="hint">
+          Số ngày nghỉ: <strong>{previewDays}</strong> ngày
+          {includesSunday && ' (đã trừ Chủ nhật)'}
+        </p>
+
         <div className="webhook-register-actions">
-          <UiButton onClick={() => void submit()} disabled={loading}>
+          <UiButton onClick={() => void submit()} disabled={loading || previewDays <= 0}>
             {loading ? 'Đang gửi…' : 'Gửi đơn xin nghỉ'}
           </UiButton>
         </div>
         <p className="hint">Đơn sẽ ở trạng thái "Chờ duyệt" cho đến khi Admin xác nhận.</p>
+        {previewDays <= 0 && (
+          <p className="hint hint-error">Khoảng ngày đã chọn không có ngày nào được tính (Chủ nhật không tính vào ngày nghỉ).</p>
+        )}
         {error && <p className="hint hint-error">{error}</p>}
       </section>
 
@@ -347,6 +380,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               <thead>
                 <tr>
                   <th>Nhân viên</th>
+                  <th>Phòng ban</th>
                   <th>Loại</th>
                   <th>Từ ngày</th>
                   <th>Đến ngày</th>
@@ -359,6 +393,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                 {pending.map((r) => (
                   <tr key={r._id}>
                     <td>{r.employeeName}</td>
+                    <td>{r.department || '—'}</td>
                     <td>{typeLabel(r.type)}</td>
                     <td>{formatDate(r.startDate)}</td>
                     <td>{formatDate(r.endDate)}</td>
