@@ -366,12 +366,17 @@ export function UserManagement({ token, currentUsername }: Props) {
             size="small"
           />
           <TextField
-            label={editTarget ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu'}
+            label={editTarget ? 'Đặt lại mật khẩu (để trống nếu không đổi)' : 'Mật khẩu'}
             type="password"
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             fullWidth
             size="small"
+            helperText={
+              editTarget
+                ? 'Vì lý do bảo mật, hệ thống không thể hiển thị mật khẩu hiện tại của người dùng — chỉ có thể đặt mật khẩu mới.'
+                : undefined
+            }
           />
           <FormControl size="small" fullWidth>
             <InputLabel>Vai trò</InputLabel>

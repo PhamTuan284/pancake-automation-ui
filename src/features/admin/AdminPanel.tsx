@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TabVisibilitySettings } from './TabVisibilitySettings';
 import { BotSettings } from './BotSettings';
 import { UserManagement } from './UserManagement';
+import { ActivityLog } from './ActivityLog';
 
 type AdminSettings = {
   tabAccess: Record<string, string[]>;
@@ -56,6 +57,7 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
         <Tab label="Hiển thị tab" />
         <Tab label="Bật/Tắt Bot" />
         {user.role === 'admin' && <Tab label="Người dùng" />}
+        {user.role === 'admin' && <Tab label="Nhật ký hoạt động" />}
       </Tabs>
 
       {activeTab === 0 && (
@@ -74,6 +76,9 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
       )}
       {activeTab === 2 && user.role === 'admin' && (
         <UserManagement token={user.token} currentUsername={user.username} />
+      )}
+      {activeTab === 3 && user.role === 'admin' && (
+        <ActivityLog token={user.token} />
       )}
     </Box>
   );

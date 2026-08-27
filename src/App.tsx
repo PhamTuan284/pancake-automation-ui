@@ -16,6 +16,7 @@ import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
 import { LoginScreen } from './components/LoginScreen';
+import { ChangePasswordDialog } from './components/ChangePasswordDialog';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiUrl } from './lib/api';
 
@@ -68,6 +69,7 @@ function AppInner() {
   const { user, logout } = useAuth();
   const userRole = user?.role ?? 'user';
   const userDepartment = user?.department ?? '';
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_SETTINGS);
 
@@ -150,6 +152,9 @@ function AppInner() {
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip label={user.fullName || user.username} size="small" color={user.role === 'admin' ? 'primary' : 'default'} />
+            <Button size="small" variant="outlined" color="inherit" onClick={() => setPasswordDialogOpen(true)}>
+              Đổi mật khẩu
+            </Button>
             <Button size="small" variant="outlined" color="inherit" onClick={() => logout()}>
               Đăng xuất
             </Button>
@@ -209,6 +214,8 @@ function AppInner() {
           <AdminPanel settings={adminSettings} onSettingsChanged={handleSettingsChanged} />
         )}
       </div>
+
+      <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
     </div>
   );
 }
