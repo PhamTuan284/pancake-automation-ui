@@ -14,6 +14,8 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Chip from '@mui/material/Chip';
+import Checkbox from '@mui/material/Checkbox';
+import ListItemText from '@mui/material/ListItemText';
 import { TOOLS } from '../../config/tools';
 import { DEPARTMENTS } from '../../config/departments';
 import { authFetch } from '../../lib/authFetch';
@@ -93,7 +95,7 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
         Phân quyền truy cập Tab
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Chọn phòng ban được phép xem từng tab. Tài khoản có vai trò Admin luôn xem được mọi tab.
+        Chọn một hoặc nhiều phòng ban được phép xem từng tab. Tài khoản có vai trò Admin luôn xem được mọi tab.
         Tab Admin chỉ dành cho vai trò Admin.
       </Typography>
       <Divider sx={{ mb: 2 }} />
@@ -142,7 +144,12 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
                   >
                     {DEPARTMENT_OPTIONS.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        <Checkbox
+                          size="small"
+                          checked={(access[tool.id] ?? []).includes(opt.value)}
+                          sx={{ p: 0.5, mr: 1 }}
+                        />
+                        <ListItemText primary={opt.label} />
                       </MenuItem>
                     ))}
                   </Select>
