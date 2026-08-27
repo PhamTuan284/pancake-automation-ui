@@ -25,13 +25,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
-import { apiUrl } from '../../lib/api';
+import { authFetch } from '../../lib/authFetch';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
 import { DEPARTMENTS } from '../../config/departments';
 
 const ALL_VALUE = '__all__';
-
-const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 type UserRow = {
   _id: string;
@@ -89,8 +87,6 @@ export function UserManagement({ token, currentUsername }: Props) {
   const [roleFilter, setRoleFilter] = useState(ALL_VALUE);
   const [statusFilter, setStatusFilter] = useState(ALL_VALUE);
 
-  const authHeader = { Authorization: `Bearer ${token}` };
-
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return users.filter((u) => {
@@ -108,11 +104,8 @@ export function UserManagement({ token, currentUsername }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl('/admin/users'), { headers: authHeader });
-      if (res.status === 401) {
-        logout(SESSION_EXPIRED_MESSAGE);
-        return;
-      }
+      const res = await authFetch('/admin/users', token, logout);
+      if (!res) return;
       if (!res.ok) throw new Error('Không thể tải danh sách người dùng.');
       setUsers(await res.json() as UserRow[]);
     } catch (err) {
@@ -172,27 +165,21 @@ export function UserManagement({ token, currentUsername }: Props) {
         if (Number.isFinite(paidLeaveTotal) && paidLeaveTotal >= 0) {
           body.paidLeaveTotal = paidLeaveTotal;
         }
-        const res = await fetch(apiUrl(`/admin/users/${editTarget._id}`), {
+        const res = await authFetch(`/admin/users/${editTarget._id}`, token, logout, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.status === 401) {
-          logout(SESSION_EXPIRED_MESSAGE);
-          return;
-        }
+        if (!res) return;
         const data = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(data.error ?? 'Cập nhật thất bại.');
       } else {
-        const res = await fetch(apiUrl('/admin/users'), {
+        const res = await authFetch('/admin/users', token, logout, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         });
-        if (res.status === 401) {
-          logout(SESSION_EXPIRED_MESSAGE);
-          return;
-        }
+        if (!res) return;
         const data = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(data.error ?? 'Tạo người dùng thất bại.');
       }
@@ -208,14 +195,8 @@ export function UserManagement({ token, currentUsername }: Props) {
   async function handleDelete(user: UserRow) {
     if (!window.confirm(`Xóa người dùng "${user.username}"?`)) return;
     try {
-      const res = await fetch(apiUrl(`/admin/users/${user._id}`), {
-        method: 'DELETE',
-        headers: authHeader,
-      });
-      if (res.status === 401) {
-        logout(SESSION_EXPIRED_MESSAGE);
-        return;
-      }
+      const res = await authFetch(`/admin/users/${user._id}`, token, logout, { method: 'DELETE' });
+      if (!res) return;
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Xóa thất bại.');
       await fetchUsers();

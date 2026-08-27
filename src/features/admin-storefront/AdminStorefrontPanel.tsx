@@ -20,6 +20,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../context/AuthContext';
 import { apiUrl } from '../../lib/api';
+import { authFetch } from '../../lib/authFetch';
 
 // ─── local types ────────────────────────────────────────────────────────────
 
@@ -402,7 +403,7 @@ function ProductImagesTab({
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function AdminStorefrontPanel({ toolDescription }: { toolDescription: string }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [config, setConfig] = useState<StorefrontConfig>(DEFAULT_CONFIG);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
@@ -430,14 +431,12 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
     setError(null);
     setSuccess(false);
     try {
-      const res = await fetch(apiUrl('/admin/storefront-config'), {
+      const res = await authFetch('/admin/storefront-config', user.token, logout, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
+      if (!res) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? 'Lưu thất bại.');

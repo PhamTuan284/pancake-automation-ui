@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LeaveBalance, LeaveInputDraft, LeaveRecord, LeaveStatus } from '../../types';
 import { LEAVE_TYPES, LEAVE_TYPE_LABEL } from '../../config/leaveTypes';
-import { apiUrl } from '../../lib/api';
+import { authFetch } from '../../lib/authFetch';
 import { UiButton } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 
@@ -59,7 +59,7 @@ function availableLeaveTypes(gender: 'male' | 'female' | undefined) {
 }
 
 export function LeavePanel({ toolDescription }: { toolDescription: string }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [draft, setDraft] = useState<LeaveInputDraft>(EMPTY_DRAFT);
   const [records, setRecords] = useState<LeaveRecord[]>([]);
   const [pending, setPending] = useState<LeaveRecord[]>([]);
@@ -71,13 +71,13 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
   const [balancesLoading, setBalancesLoading] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const isAdmin = user?.role === 'admin';
-
-  const authHeader = { Authorization: `Bearer ${user?.token ?? ''}` };
+  const token = user?.token ?? '';
 
   const loadRecords = async () => {
     setListLoading(true);
     try {
-      const res = await fetch(apiUrl('/leave/mine'), { headers: authHeader });
+      const res = await authFetch('/leave/mine', token, logout);
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as {
         records?: LeaveRecord[];
         error?: string;
@@ -92,7 +92,8 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
 
   const loadMyBalance = async () => {
     try {
-      const res = await fetch(apiUrl('/leave/my-balance'), { headers: authHeader });
+      const res = await authFetch('/leave/my-balance', token, logout);
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as { balance?: LeaveBalance; error?: string };
       if (res.ok && data.balance) setMyBalance(data.balance);
     } catch {
@@ -102,7 +103,8 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
 
   const loadPending = async () => {
     try {
-      const res = await fetch(apiUrl('/leave/all'), { headers: authHeader });
+      const res = await authFetch('/leave/all', token, logout);
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as { records?: LeaveRecord[]; error?: string };
       if (res.ok && data.records) setPending(data.records.filter((r) => r.status === 'pending'));
     } catch {
@@ -113,7 +115,8 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
   const loadBalances = async () => {
     setBalancesLoading(true);
     try {
-      const res = await fetch(apiUrl('/leave/balances'), { headers: authHeader });
+      const res = await authFetch('/leave/balances', token, logout);
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as {
         balances?: LeaveBalance[];
         error?: string;
@@ -134,7 +137,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
       void loadBalances();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.token, isAdmin]);
+  }, [token, isAdmin]);
 
   const updateField = (key: 'type' | 'startDate' | 'endDate' | 'reason', value: string) => {
     setDraft((prev) => {
@@ -162,11 +165,12 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(apiUrl('/leave'), {
+      const res = await authFetch('/leave', token, logout, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       });
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || 'Không thể ghi nhận nghỉ phép.');
       setDraft(EMPTY_DRAFT);
@@ -180,7 +184,8 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
 
   const removeRecord = async (id: string) => {
     try {
-      const res = await fetch(apiUrl(`/leave/${id}`), { method: 'DELETE', headers: authHeader });
+      const res = await authFetch(`/leave/${id}`, token, logout, { method: 'DELETE' });
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || 'Không thể hủy đơn.');
       setRecords((prev) => prev.filter((r) => r._id !== id));
@@ -198,11 +203,12 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
     }
     setDecidingId(id);
     try {
-      const res = await fetch(apiUrl(`/leave/${id}/${decision}`), {
+      const res = await authFetch(`/leave/${id}/${decision}`, token, logout, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
+      if (!res) return;
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || 'Không thể xử lý đơn.');
       await refreshAll();
@@ -450,7 +456,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                   <td>{typeLabel(r.type)}</td>
                   <td>{formatDate(r.startDate)}</td>
                   <td>{formatDate(r.endDate)}</td>
-                  <td>{r.days}</td>
+                  <td>{daysLabel(r)}</td>
                   <td>{r.reason || '—'}</td>
                   <td>
                     <span className={statusClass(r.status)}>{statusLabel(r.status)}</span>

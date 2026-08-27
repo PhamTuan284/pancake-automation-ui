@@ -16,10 +16,8 @@ import TableRow from '@mui/material/TableRow';
 import Chip from '@mui/material/Chip';
 import { TOOLS } from '../../config/tools';
 import { DEPARTMENTS } from '../../config/departments';
-import { apiUrl } from '../../lib/api';
+import { authFetch } from '../../lib/authFetch';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
-
-const SESSION_EXPIRED_MESSAGE = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
 /** Sentinel meaning "any logged-in user, regardless of department". */
 const ALL_VALUE = '*';
@@ -72,18 +70,12 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
     setError(null);
     setSuccess(false);
     try {
-      const res = await fetch(apiUrl('/admin/settings'), {
+      const res = await authFetch('/admin/settings', token, logout, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tabAccess: access }),
       });
-      if (res.status === 401) {
-        logout(SESSION_EXPIRED_MESSAGE);
-        return;
-      }
+      if (!res) return;
       const data = (await res.json()) as { tabAccess?: Record<string, string[]>; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Lưu thất bại.');
       onSaved(data.tabAccess ?? access);
