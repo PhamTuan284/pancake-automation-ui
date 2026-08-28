@@ -417,6 +417,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
         </h2>
         {!myBalance && <p className="muted">Đang tải…</p>}
         {myBalance && (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -439,6 +440,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -449,6 +451,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
           </h2>
           {pending.length === 0 && <p className="muted small">Không có đơn nào đang chờ duyệt.</p>}
           {pending.length > 0 && (
+            <div className="table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -493,6 +496,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       )}
@@ -544,6 +548,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
           <p className="muted small">Chưa có bản ghi nghỉ phép nào.</p>
         )}
         {records.length > 0 && (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -587,6 +592,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </>

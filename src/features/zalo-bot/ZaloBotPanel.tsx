@@ -342,6 +342,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
         <p className="muted small">
           Thiết lập các biến môi trường sau trên server:
         </p>
+        <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -359,6 +360,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
             <tr><td><code>ZALO_EXCLUDE_VARIANTS</code></td><td>Mã biến thể loại trừ, phân cách bằng dấu phẩy (vd: <code>H,MTL01</code>)</td></tr>
           </tbody>
         </table>
+        </div>
 
         {configLoading && <p className="muted">Đang tải…</p>}
         {configError && <p className="hint hint-error">{configError}</p>}
@@ -444,7 +446,8 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
               Không tìm thấy nhóm nào. Gửi tin vào nhóm rồi thử lại.
             </p>
           ) : (
-            <table className="data-table" style={{ marginTop: '0.75rem' }}>
+            <div className="table-scroll" style={{ marginTop: '0.75rem' }}>
+            <table className="data-table">
               <thead>
                 <tr><th>Chat ID</th><th>Tên nhóm</th><th>Loại</th></tr>
               </thead>
@@ -458,6 +461,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )
         )}
       </section>
