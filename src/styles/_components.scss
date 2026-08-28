@@ -70,6 +70,10 @@
   color: t.$text-primary;
   outline: none;
   transition: border-color t.$trans-fast, box-shadow t.$trans-fast;
+  // Native date/time picker icons default to black regardless of page
+  // theme — this tells the browser to render its built-in form control
+  // chrome (calendar/clock icon included) in a dark-theme-appropriate color.
+  color-scheme: dark;
 }
 
 .search-input {
