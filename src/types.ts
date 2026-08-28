@@ -126,6 +126,8 @@ export type LeaveInputDraft = {
   startDate: string;
   endDate: string;
   session: LeaveSession;
+  checkInTime: string;
+  checkOutTime: string;
   reason: string;
 };
 
@@ -139,6 +141,8 @@ export type LeaveRecord = {
   endDate: string;
   session: LeaveSession;
   days: number;
+  checkInTime?: string;
+  checkOutTime?: string;
   reason: string;
   status: LeaveStatus;
   approvedBy?: string;

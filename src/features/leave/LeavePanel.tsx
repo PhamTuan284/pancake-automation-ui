@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { LeaveBalance, LeaveInputDraft, LeaveRecord, LeaveStatus } from '../../types';
-import { LEAVE_TYPES, LEAVE_TYPE_LABEL } from '../../config/leaveTypes';
+import {
+  LEAVE_TYPES,
+  LEAVE_TYPE_LABEL,
+  NO_QUOTA_LEAVE_TYPES,
+  TIME_RANGE_LEAVE_TYPES,
+  type LeaveType,
+} from '../../config/leaveTypes';
 import { authFetch } from '../../lib/authFetch';
 import { UiButton } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +20,8 @@ const EMPTY_DRAFT: LeaveInputDraft = {
   startDate: todayIso(),
   endDate: todayIso(),
   session: 'full',
+  checkInTime: '',
+  checkOutTime: '',
   reason: '',
 };
 
@@ -44,11 +52,22 @@ function typeLabel(type: string): string {
   return LEAVE_TYPE_LABEL[type as keyof typeof LEAVE_TYPE_LABEL] ?? type;
 }
 
+function reasonCell(r: LeaveRecord): string {
+  if (r.checkInTime || r.checkOutTime) {
+    const times = `Vào: ${r.checkInTime ?? '—'} · Về: ${r.checkOutTime ?? '—'}`;
+    return r.reason ? `${times} — ${r.reason}` : times;
+  }
+  return r.reason || '—';
+}
+
 function daysLabel(r: LeaveRecord): string {
+  if (NO_QUOTA_LEAVE_TYPES.has(r.type as LeaveType)) return '—';
   if (r.session === 'morning') return `${r.days} (sáng)`;
   if (r.session === 'afternoon') return `${r.days} (chiều)`;
   return String(r.days);
 }
+
+const BALANCE_LEAVE_TYPES = LEAVE_TYPES.filter((t) => !NO_QUOTA_LEAVE_TYPES.has(t.id));
 
 /**
  * Calendar days from `startIso` to `endIso` inclusive, excluding Sundays —
@@ -161,9 +180,20 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isAdmin]);
 
+  const isNoQuotaType = NO_QUOTA_LEAVE_TYPES.has(draft.type as LeaveType);
+  const isTimeRangeType = TIME_RANGE_LEAVE_TYPES.has(draft.type as LeaveType);
+
   const updateField = (key: 'type' | 'startDate' | 'endDate' | 'reason', value: string) => {
     setDraft((prev) => {
       const next = { ...prev, [key]: value };
+      // "Đi muộn"/"Về sớm" are single-occurrence permission requests.
+      if (key === 'type' && NO_QUOTA_LEAVE_TYPES.has(value as LeaveType)) {
+        next.endDate = next.startDate;
+        next.session = 'full';
+      }
+      if (key === 'startDate' && NO_QUOTA_LEAVE_TYPES.has(next.type as LeaveType)) {
+        next.endDate = value;
+      }
       // Half-day only makes sense for a single-day request.
       if ((key === 'startDate' || key === 'endDate') && next.startDate !== next.endDate) {
         next.session = 'full';
@@ -176,6 +206,9 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
   const rangePreview = countLeaveDays(draft.startDate, draft.endDate);
   const previewDays = draft.session === 'full' ? rangePreview.days : 0.5;
   const includesSunday = draft.session === 'full' && rangePreview.hasSunday;
+  const canSubmit = isTimeRangeType
+    ? Boolean(draft.checkInTime && draft.checkOutTime)
+    : isNoQuotaType || previewDays > 0;
 
   const refreshAll = async () => {
     await loadRecords();
@@ -286,29 +319,55 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               onChange={(e) => updateField('startDate', e.target.value)}
             />
           </label>
-          <label className="webhook-register-field">
-            <span>Đến ngày</span>
-            <input
-              type="date"
-              className="search-input webhook-url-input"
-              value={draft.endDate}
-              onChange={(e) => updateField('endDate', e.target.value)}
-            />
-          </label>
-          <label className="webhook-register-field">
-            <span>Buổi nghỉ</span>
-            <select
-              className="search-input webhook-url-input"
-              value={draft.session}
-              disabled={!isSingleDay}
-              onChange={(e) => setDraft((prev) => ({ ...prev, session: e.target.value as LeaveInputDraft['session'] }))}
-            >
-              {(Object.keys(SESSION_LABEL) as LeaveInputDraft['session'][]).map((s) => (
-                <option key={s} value={s}>{SESSION_LABEL[s]}</option>
-              ))}
-            </select>
-            {!isSingleDay && <span className="muted small">Chỉ chọn được nửa ngày khi nghỉ 1 ngày duy nhất.</span>}
-          </label>
+          {!isNoQuotaType && (
+            <label className="webhook-register-field">
+              <span>Đến ngày</span>
+              <input
+                type="date"
+                className="search-input webhook-url-input"
+                value={draft.endDate}
+                onChange={(e) => updateField('endDate', e.target.value)}
+              />
+            </label>
+          )}
+          {!isNoQuotaType && (
+            <label className="webhook-register-field">
+              <span>Buổi nghỉ</span>
+              <select
+                className="search-input webhook-url-input"
+                value={draft.session}
+                disabled={!isSingleDay}
+                onChange={(e) => setDraft((prev) => ({ ...prev, session: e.target.value as LeaveInputDraft['session'] }))}
+              >
+                {(Object.keys(SESSION_LABEL) as LeaveInputDraft['session'][]).map((s) => (
+                  <option key={s} value={s}>{SESSION_LABEL[s]}</option>
+                ))}
+              </select>
+              {!isSingleDay && <span className="muted small">Chỉ chọn được nửa ngày khi nghỉ 1 ngày duy nhất.</span>}
+            </label>
+          )}
+          {isTimeRangeType && (
+            <>
+              <label className="webhook-register-field">
+                <span>Giờ vào làm</span>
+                <input
+                  type="time"
+                  className="search-input webhook-url-input"
+                  value={draft.checkInTime}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, checkInTime: e.target.value }))}
+                />
+              </label>
+              <label className="webhook-register-field">
+                <span>Giờ về</span>
+                <input
+                  type="time"
+                  className="search-input webhook-url-input"
+                  value={draft.checkOutTime}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, checkOutTime: e.target.value }))}
+                />
+              </label>
+            </>
+          )}
           <label className="webhook-register-field">
             <span>Lý do</span>
             <input
@@ -316,23 +375,37 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
               className="search-input webhook-url-input"
               value={draft.reason}
               onChange={(e) => updateField('reason', e.target.value)}
-              placeholder="Nghỉ phép năm, việc gia đình,…"
+              placeholder={
+                isTimeRangeType
+                  ? 'VD: Đưa con đi khám bệnh, việc gia đình đột xuất…'
+                  : isNoQuotaType
+                  ? 'VD: Đi muộn 30 phút do tắc đường, về sớm 1 tiếng do việc gia đình…'
+                  : 'Nghỉ phép năm, việc gia đình,…'
+              }
             />
           </label>
         </div>
 
-        <p className="hint">
-          Số ngày nghỉ: <strong>{previewDays}</strong> ngày
-          {includesSunday && ' (đã trừ Chủ nhật)'}
-        </p>
+        {isNoQuotaType ? (
+          <p className="hint">
+            {isTimeRangeType
+              ? 'Đi làm khác giờ chuẩn không tính vào ngày nghỉ phép.'
+              : 'Đi muộn/Về sớm không tính vào ngày nghỉ phép.'}
+          </p>
+        ) : (
+          <p className="hint">
+            Số ngày nghỉ: <strong>{previewDays}</strong> ngày
+            {includesSunday && ' (đã trừ Chủ nhật)'}
+          </p>
+        )}
 
         <div className="webhook-register-actions">
-          <UiButton onClick={() => void submit()} disabled={loading || previewDays <= 0}>
+          <UiButton onClick={() => void submit()} disabled={loading || !canSubmit}>
             {loading ? 'Đang gửi…' : 'Gửi đơn xin nghỉ'}
           </UiButton>
         </div>
         <p className="hint">Đơn sẽ ở trạng thái "Chờ duyệt" cho đến khi Admin xác nhận.</p>
-        {previewDays <= 0 && (
+        {!isNoQuotaType && previewDays <= 0 && (
           <p className="hint hint-error">Khoảng ngày đã chọn không có ngày nào được tính (Chủ nhật không tính vào ngày nghỉ).</p>
         )}
         {error && <p className="hint hint-error">{error}</p>}
@@ -398,7 +471,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                     <td>{formatDate(r.startDate)}</td>
                     <td>{formatDate(r.endDate)}</td>
                     <td>{daysLabel(r)}</td>
-                    <td>{r.reason || '—'}</td>
+                    <td>{reasonCell(r)}</td>
                     <td style={{ display: 'flex', gap: 8 }}>
                       <UiButton
                         variant="tiny"
@@ -440,7 +513,7 @@ export function LeavePanel({ toolDescription }: { toolDescription: string }) {
                   <tr>
                     <th>Nhân viên</th>
                     <th>Phòng ban</th>
-                    {LEAVE_TYPES.map((t) => (
+                    {BALANCE_LEAVE_TYPES.map((t) => (
                       <th key={t.id}>{t.label}<br /><span className="muted small">còn lại/tổng</span></th>
                     ))}
                   </tr>
