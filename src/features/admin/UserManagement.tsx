@@ -18,6 +18,8 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -28,6 +30,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { authFetch } from '../../lib/authFetch';
 import { useAuth, type AuthUser } from '../../context/AuthContext';
 import { DEPARTMENTS } from '../../config/departments';
+import { WORK_MODES, WORK_MODE_LABEL, type WorkMode } from '../../config/workModes';
 
 const ALL_VALUE = '__all__';
 
@@ -41,6 +44,7 @@ type UserRow = {
   department: string;
   hireDate?: string;
   gender?: 'male' | 'female';
+  workMode?: WorkMode;
   createdAt: string;
 };
 
@@ -58,6 +62,7 @@ type FormState = {
   department: string;
   hireDate: string;
   gender: '' | 'male' | 'female';
+  workMode: '' | WorkMode;
 };
 
 const EMPTY_FORM: FormState = {
@@ -69,7 +74,84 @@ const EMPTY_FORM: FormState = {
   department: '',
   hireDate: '',
   gender: '',
+  workMode: '',
 };
+
+/** Bulk-edit form: each field has an "apply this change?" toggle since it's shared across many people. */
+type BulkFormState = {
+  role: { enabled: boolean; value: 'admin' | 'user' };
+  department: { enabled: boolean; value: string };
+  workMode: { enabled: boolean; value: '' | WorkMode };
+  isActive: { enabled: boolean; value: 'true' | 'false' };
+};
+
+const EMPTY_BULK_FORM: BulkFormState = {
+  role: { enabled: false, value: 'user' },
+  department: { enabled: false, value: '' },
+  workMode: { enabled: false, value: '' },
+  isActive: { enabled: false, value: 'true' },
+};
+
+type SortKey =
+  | 'username'
+  | 'fullName'
+  | 'role'
+  | 'department'
+  | 'gender'
+  | 'workMode'
+  | 'hireDate'
+  | 'isActive'
+  | 'paidLeaveTotal'
+  | 'createdAt';
+
+const SORT_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'username', label: 'Tên đăng nhập' },
+  { key: 'fullName', label: 'Họ và tên' },
+  { key: 'role', label: 'Vai trò' },
+  { key: 'department', label: 'Phòng ban' },
+  { key: 'gender', label: 'Giới tính' },
+  { key: 'workMode', label: 'Hình thức làm việc' },
+  { key: 'hireDate', label: 'Ngày vào làm' },
+  { key: 'isActive', label: 'Trạng thái' },
+  { key: 'paidLeaveTotal', label: 'Tổng phép năm' },
+  { key: 'createdAt', label: 'Ngày tạo' },
+];
+
+function sortValue(user: UserRow, key: SortKey): string | number {
+  switch (key) {
+    case 'username':
+      return user.username.toLowerCase();
+    case 'fullName':
+      return (user.fullName ?? '').toLowerCase();
+    case 'role':
+      return user.role;
+    case 'department':
+      return user.department ?? '';
+    case 'gender':
+      return user.gender ?? '';
+    case 'workMode':
+      return user.workMode ? WORK_MODE_LABEL[user.workMode] : '';
+    case 'hireDate':
+      return user.hireDate ?? '';
+    case 'isActive':
+      return user.isActive ? 1 : 0;
+    case 'paidLeaveTotal':
+      return user.paidLeaveTotal ?? 0;
+    case 'createdAt':
+      return user.createdAt;
+  }
+}
+
+/** Empty values always sort last, regardless of direction — "unset" isn't meaningfully "less than" a real value. */
+function compareUsers(a: UserRow, b: UserRow, key: SortKey, dir: 'asc' | 'desc'): number {
+  const va = sortValue(a, key);
+  const vb = sortValue(b, key);
+  if (va === '' && vb === '') return 0;
+  if (va === '') return 1;
+  if (vb === '') return -1;
+  const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'vi');
+  return dir === 'asc' ? cmp : -cmp;
+}
 
 export function UserManagement({ token, currentUsername }: Props) {
   const { logout } = useAuth();
@@ -87,9 +169,27 @@ export function UserManagement({ token, currentUsername }: Props) {
   const [roleFilter, setRoleFilter] = useState(ALL_VALUE);
   const [statusFilter, setStatusFilter] = useState(ALL_VALUE);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState<BulkFormState>(EMPTY_BULK_FORM);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  const [sortKey, setSortKey] = useState<SortKey>('username');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return users.filter((u) => {
+    const filtered = users.filter((u) => {
       if (departmentFilter !== ALL_VALUE && u.department !== departmentFilter) return false;
       if (roleFilter !== ALL_VALUE && u.role !== roleFilter) return false;
       if (statusFilter !== ALL_VALUE && String(u.isActive) !== statusFilter) return false;
@@ -98,7 +198,8 @@ export function UserManagement({ token, currentUsername }: Props) {
       }
       return true;
     });
-  }, [users, search, departmentFilter, roleFilter, statusFilter]);
+    return [...filtered].sort((a, b) => compareUsers(a, b, sortKey, sortDir));
+  }, [users, search, departmentFilter, roleFilter, statusFilter, sortKey, sortDir]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -135,6 +236,7 @@ export function UserManagement({ token, currentUsername }: Props) {
       department: user.department ?? '',
       hireDate: user.hireDate ? user.hireDate.slice(0, 10) : '',
       gender: user.gender ?? '',
+      workMode: user.workMode ?? '',
     });
     setFormError(null);
     setDialogOpen(true);
@@ -159,6 +261,7 @@ export function UserManagement({ token, currentUsername }: Props) {
           department: form.department,
           hireDate: form.hireDate,
           gender: form.gender,
+          workMode: form.workMode,
         };
         if (form.password) body.password = form.password;
         const paidLeaveTotal = Number(form.paidLeaveTotal);
@@ -189,6 +292,60 @@ export function UserManagement({ token, currentUsername }: Props) {
       setFormError(err instanceof Error ? err.message : 'Lỗi không xác định.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllFiltered() {
+    const filteredIds = filteredUsers.map((u) => u._id);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(filteredIds));
+  }
+
+  function openBulkEdit() {
+    setBulkForm(EMPTY_BULK_FORM);
+    setBulkError(null);
+    setBulkDialogOpen(true);
+  }
+
+  async function handleBulkSubmit() {
+    const body: Record<string, unknown> = { ids: [...selectedIds] };
+    if (bulkForm.role.enabled) body.role = bulkForm.role.value;
+    if (bulkForm.department.enabled) body.department = bulkForm.department.value;
+    if (bulkForm.workMode.enabled) body.workMode = bulkForm.workMode.value;
+    if (bulkForm.isActive.enabled) body.isActive = bulkForm.isActive.value === 'true';
+
+    if (Object.keys(body).length === 1) {
+      setBulkError('Chọn ít nhất 1 thay đổi để áp dụng.');
+      return;
+    }
+
+    setBulkSaving(true);
+    setBulkError(null);
+    try {
+      const res = await authFetch('/admin/users/bulk', token, logout, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res) return;
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Cập nhật hàng loạt thất bại.');
+      setBulkDialogOpen(false);
+      setSelectedIds(new Set());
+      await fetchUsers();
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : 'Lỗi không xác định.');
+    } finally {
+      setBulkSaving(false);
     }
   }
 
@@ -272,6 +429,21 @@ export function UserManagement({ token, currentUsername }: Props) {
         </FormControl>
       </Box>
 
+      {selectedIds.size > 0 && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button size="small" onClick={openBulkEdit}>Sửa hàng loạt</Button>
+              <Button size="small" onClick={() => setSelectedIds(new Set())}>Bỏ chọn</Button>
+            </Box>
+          }
+        >
+          Đã chọn {selectedIds.size} người dùng.
+        </Alert>
+      )}
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
@@ -280,22 +452,35 @@ export function UserManagement({ token, currentUsername }: Props) {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Tên đăng nhập</TableCell>
-              <TableCell>Họ và tên</TableCell>
-              <TableCell>Vai trò</TableCell>
-              <TableCell>Phòng ban</TableCell>
-              <TableCell>Giới tính</TableCell>
-              <TableCell>Ngày vào làm</TableCell>
-              <TableCell>Trạng thái</TableCell>
-              <TableCell>Tổng phép năm</TableCell>
-              <TableCell>Ngày tạo</TableCell>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  size="small"
+                  checked={filteredUsers.length > 0 && filteredUsers.every((u) => selectedIds.has(u._id))}
+                  indeterminate={
+                    filteredUsers.some((u) => selectedIds.has(u._id)) &&
+                    !filteredUsers.every((u) => selectedIds.has(u._id))
+                  }
+                  onChange={toggleSelectAllFiltered}
+                />
+              </TableCell>
+              {SORT_COLUMNS.map((col) => (
+                <TableCell key={col.key}>
+                  <TableSortLabel
+                    active={sortKey === col.key}
+                    direction={sortKey === col.key ? sortDir : 'asc'}
+                    onClick={() => handleSort(col.key)}
+                  >
+                    {col.label}
+                  </TableSortLabel>
+                </TableCell>
+              ))}
               <TableCell align="right">Thao tác</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredUsers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10}>
+                <TableCell colSpan={12}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
                     Không tìm thấy người dùng phù hợp.
                   </Typography>
@@ -303,7 +488,10 @@ export function UserManagement({ token, currentUsername }: Props) {
               </TableRow>
             )}
             {filteredUsers.map((u) => (
-              <TableRow key={u._id}>
+              <TableRow key={u._id} selected={selectedIds.has(u._id)}>
+                <TableCell padding="checkbox">
+                  <Checkbox size="small" checked={selectedIds.has(u._id)} onChange={() => toggleSelected(u._id)} />
+                </TableCell>
                 <TableCell>{u.username}</TableCell>
                 <TableCell>{u.fullName || '—'}</TableCell>
                 <TableCell>
@@ -315,6 +503,7 @@ export function UserManagement({ token, currentUsername }: Props) {
                 </TableCell>
                 <TableCell>{u.department || '—'}</TableCell>
                 <TableCell>{u.gender === 'male' ? 'Nam' : u.gender === 'female' ? 'Nữ' : '—'}</TableCell>
+                <TableCell>{u.workMode ? WORK_MODE_LABEL[u.workMode] : '—'}</TableCell>
                 <TableCell>{u.hireDate ? new Date(u.hireDate).toLocaleDateString('vi-VN') : '—'}</TableCell>
                 <TableCell>
                   <Chip
@@ -414,6 +603,19 @@ export function UserManagement({ token, currentUsername }: Props) {
               <MenuItem value="female">Nữ</MenuItem>
             </Select>
           </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Hình thức làm việc</InputLabel>
+            <Select
+              label="Hình thức làm việc"
+              value={form.workMode}
+              onChange={(e) => setForm((f) => ({ ...f, workMode: e.target.value as FormState['workMode'] }))}
+            >
+              <MenuItem value="">— Không chọn —</MenuItem>
+              {WORK_MODES.map((mode) => (
+                <MenuItem key={mode} value={mode}>{WORK_MODE_LABEL[mode]}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
             label="Ngày vào làm"
             type="date"
@@ -445,6 +647,124 @@ export function UserManagement({ token, currentUsername }: Props) {
             startIcon={saving ? <CircularProgress size={16} /> : undefined}
           >
             {editTarget ? 'Lưu' : 'Tạo'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDialogOpen} onClose={() => setBulkDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Sửa hàng loạt ({selectedIds.size} người dùng)</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          <Typography variant="body2" color="text.secondary">
+            Chỉ tick "Áp dụng" ở mục nào bạn muốn thay đổi hàng loạt — mục không tick sẽ giữ nguyên giá trị hiện tại của từng người.
+          </Typography>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Checkbox
+              checked={bulkForm.role.enabled}
+              onChange={(e) => setBulkForm((f) => ({ ...f, role: { ...f.role, enabled: e.target.checked } }))}
+            />
+            <FormControl size="small" fullWidth disabled={!bulkForm.role.enabled}>
+              <InputLabel>Vai trò</InputLabel>
+              <Select
+                label="Vai trò"
+                value={bulkForm.role.value}
+                onChange={(e) =>
+                  setBulkForm((f) => ({ ...f, role: { ...f.role, value: e.target.value as 'admin' | 'user' } }))
+                }
+              >
+                <MenuItem value="user">User</MenuItem>
+                <MenuItem value="admin">Admin</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Checkbox
+              checked={bulkForm.department.enabled}
+              onChange={(e) =>
+                setBulkForm((f) => ({ ...f, department: { ...f.department, enabled: e.target.checked } }))
+              }
+            />
+            <FormControl size="small" fullWidth disabled={!bulkForm.department.enabled}>
+              <InputLabel>Phòng ban</InputLabel>
+              <Select
+                label="Phòng ban"
+                value={bulkForm.department.value}
+                onChange={(e) =>
+                  setBulkForm((f) => ({ ...f, department: { ...f.department, value: e.target.value } }))
+                }
+              >
+                <MenuItem value="">— Không chọn —</MenuItem>
+                {DEPARTMENTS.map((dept) => (
+                  <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Checkbox
+              checked={bulkForm.workMode.enabled}
+              onChange={(e) =>
+                setBulkForm((f) => ({ ...f, workMode: { ...f.workMode, enabled: e.target.checked } }))
+              }
+            />
+            <FormControl size="small" fullWidth disabled={!bulkForm.workMode.enabled}>
+              <InputLabel>Hình thức làm việc</InputLabel>
+              <Select
+                label="Hình thức làm việc"
+                value={bulkForm.workMode.value}
+                onChange={(e) =>
+                  setBulkForm((f) => ({
+                    ...f,
+                    workMode: { ...f.workMode, value: e.target.value as BulkFormState['workMode']['value'] },
+                  }))
+                }
+              >
+                <MenuItem value="">— Không chọn —</MenuItem>
+                {WORK_MODES.map((mode) => (
+                  <MenuItem key={mode} value={mode}>{WORK_MODE_LABEL[mode]}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Checkbox
+              checked={bulkForm.isActive.enabled}
+              onChange={(e) =>
+                setBulkForm((f) => ({ ...f, isActive: { ...f.isActive, enabled: e.target.checked } }))
+              }
+            />
+            <FormControl size="small" fullWidth disabled={!bulkForm.isActive.enabled}>
+              <InputLabel>Trạng thái</InputLabel>
+              <Select
+                label="Trạng thái"
+                value={bulkForm.isActive.value}
+                onChange={(e) =>
+                  setBulkForm((f) => ({
+                    ...f,
+                    isActive: { ...f.isActive, value: e.target.value as 'true' | 'false' },
+                  }))
+                }
+              >
+                <MenuItem value="true">Hoạt động</MenuItem>
+                <MenuItem value="false">Bị khóa</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {bulkError && <Alert severity="error">{bulkError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDialogOpen(false)} disabled={bulkSaving}>Hủy</Button>
+          <Button
+            variant="contained"
+            onClick={handleBulkSubmit}
+            disabled={bulkSaving}
+            startIcon={bulkSaving ? <CircularProgress size={16} /> : undefined}
+          >
+            Áp dụng
           </Button>
         </DialogActions>
       </Dialog>

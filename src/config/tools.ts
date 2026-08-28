@@ -9,26 +9,19 @@ export const TOOLS: ToolDef[] = [
     description: `Điền dữ liệu khách (${shop.shopKey === 'dpa' ? 'cửa hàng DPA' : 'cửa hàng MeiT'}) và tự động phát hành hóa đơn trên Pancake.`,
   })),
   {
-    id: 'pancake-webhook',
-    label: 'Pancake · Webhook',
-    description:
-      'Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API.',
-  },
-  {
     id: 'leave',
     label: 'TMS · Nghỉ phép',
     description: 'Ghi nhận và theo dõi lịch sử nghỉ phép có lương của nhân viên nội bộ.',
   },
   {
-    id: 'zalo-bot',
-    label: 'Zalo · Bot',
-    description:
-      'Gửi báo cáo biến thể bán chạy từ Pancake Webhook vào nhóm Zalo tự động mỗi ngày.',
-  },
-  {
     id: 'admin-storefront',
     label: 'Admin Storefront',
     description: 'Cấu hình hero banner, category banner và giao diện storefront MeiT.',
+  },
+  {
+    id: 'integrations',
+    label: 'Kết nối bên thứ 3',
+    description: 'Facebook, Google Drive, Pancake Webhook, Zalo Bot.',
   },
   {
     id: 'admin',

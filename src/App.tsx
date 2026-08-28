@@ -10,11 +10,10 @@ import Button from '@mui/material/Button';
 import { TOOLS } from './config/tools';
 import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
-import { PancakeWebhookPanel } from './features/pancake-webhook/PancakeWebhookPanel';
 import { LeavePanel } from './features/leave/LeavePanel';
-import { ZaloBotPanel } from './features/zalo-bot/ZaloBotPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
+import { IntegrationsPanel } from './features/integrations/IntegrationsPanel';
 import { LoginScreen } from './components/LoginScreen';
 import { ChangePasswordDialog } from './components/ChangePasswordDialog';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -194,21 +193,15 @@ function AppInner() {
           ) : null
         )}
 
-        {activeToolId === 'pancake-webhook' && (
-          <PancakeWebhookPanel toolDescription={activeTool?.description ?? ''} />
-        )}
-
         {activeToolId === 'leave' && (
           <LeavePanel toolDescription={activeTool?.description ?? ''} />
-        )}
-
-        {activeToolId === 'zalo-bot' && (
-          <ZaloBotPanel toolDescription={activeTool?.description ?? ''} />
         )}
 
         {activeToolId === 'admin-storefront' && (
           <AdminStorefrontPanel toolDescription={activeTool?.description ?? ''} />
         )}
+
+        {activeToolId === 'integrations' && <IntegrationsPanel />}
 
         {activeToolId === ADMIN_TOOL_ID && (
           <AdminPanel settings={adminSettings} onSettingsChanged={handleSettingsChanged} />
