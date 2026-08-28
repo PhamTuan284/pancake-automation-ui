@@ -10,12 +10,15 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../../context/AuthContext';
 import { TabVisibilitySettings } from './TabVisibilitySettings';
 import { BotSettings } from './BotSettings';
+import { WorkHoursSettings } from './WorkHoursSettings';
 import { UserManagement } from './UserManagement';
 import { ActivityLog } from './ActivityLog';
 
 type AdminSettings = {
   tabAccess: Record<string, string[]>;
   botEnabled: { zalo: boolean };
+  officeWorkHours: { checkIn: string; checkOut: string; graceMinutes: number };
+  liveMinSessionMinutes: number;
 };
 
 type Props = {
@@ -52,10 +55,14 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
       <Tabs
         value={activeTab}
         onChange={(_e, v: number) => setActiveTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         sx={{ mb: 3 }}
       >
         <Tab label="Hiển thị tab" />
         <Tab label="Bật/Tắt Bot" />
+        <Tab label="Giờ làm chuẩn" />
         {user.role === 'admin' && <Tab label="Người dùng" />}
         {user.role === 'admin' && <Tab label="Nhật ký hoạt động" />}
       </Tabs>
@@ -74,10 +81,18 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
           onSaved={(updated) => onSettingsChanged({ botEnabled: updated })}
         />
       )}
-      {activeTab === 2 && user.role === 'admin' && (
-        <UserManagement token={user.token} currentUsername={user.username} />
+      {activeTab === 2 && (
+        <WorkHoursSettings
+          token={user.token}
+          officeWorkHours={settings.officeWorkHours}
+          liveMinSessionMinutes={settings.liveMinSessionMinutes}
+          onSaved={(updated) => onSettingsChanged(updated)}
+        />
       )}
       {activeTab === 3 && user.role === 'admin' && (
+        <UserManagement token={user.token} currentUsername={user.username} />
+      )}
+      {activeTab === 4 && user.role === 'admin' && (
         <ActivityLog token={user.token} />
       )}
     </Box>

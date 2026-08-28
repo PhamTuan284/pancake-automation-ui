@@ -22,7 +22,13 @@ export function IntegrationsPanel() {
   return (
     <Box>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-        <Tabs value={activeSubTab} onChange={(_e, next: SubTabId) => setActiveSubTab(next)}>
+        <Tabs
+          value={activeSubTab}
+          onChange={(_e, next: SubTabId) => setActiveSubTab(next)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+        >
           {SUB_TABS.map((tab) => (
             <Tab key={tab.id} value={tab.id} label={tab.label} />
           ))}

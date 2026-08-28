@@ -100,7 +100,8 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
       </Typography>
       <Divider sx={{ mb: 2 }} />
 
-      <Table size="small">
+      <Box sx={{ overflowX: 'auto' }}>
+      <Table size="small" sx={{ minWidth: 560 }}>
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Tab</TableCell>
@@ -159,6 +160,7 @@ export function TabVisibilitySettings({ token, tabAccess, onSaved }: Props) {
           ))}
         </TableBody>
       </Table>
+      </Box>
 
       <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Button

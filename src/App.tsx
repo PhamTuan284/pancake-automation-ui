@@ -14,6 +14,7 @@ import { LeavePanel } from './features/leave/LeavePanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
 import { IntegrationsPanel } from './features/integrations/IntegrationsPanel';
+import { TeamMetricsPanel } from './features/team-metrics/TeamMetricsPanel';
 import { LoginScreen } from './components/LoginScreen';
 import { ChangePasswordDialog } from './components/ChangePasswordDialog';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -25,11 +26,15 @@ const ADMIN_TOOL_ID = 'admin';
 type AdminSettings = {
   tabAccess: Record<string, string[]>;
   botEnabled: { zalo: boolean };
+  officeWorkHours: { checkIn: string; checkOut: string; graceMinutes: number };
+  liveMinSessionMinutes: number;
 };
 
 const DEFAULT_SETTINGS: AdminSettings = {
   tabAccess: {},
   botEnabled: { zalo: true },
+  officeWorkHours: { checkIn: '08:30', checkOut: '17:30', graceMinutes: 15 },
+  liveMinSessionMinutes: 90,
 };
 
 /**
@@ -140,17 +145,34 @@ function AppInner() {
   return (
     <div className="page">
       <AppBar position="static" className="app-navbar" elevation={0}>
-        <Toolbar className="app-navbar-toolbar">
+        <Toolbar
+          className="app-navbar-toolbar"
+          sx={{ flexWrap: 'wrap', rowGap: 1, py: 1 }}
+        >
           <Typography
             variant="h5"
             component="h1"
             className="app-navbar-title"
-            sx={{ flex: 1, textAlign: 'center' }}
+            sx={{ flex: 1, textAlign: 'center', minWidth: 0 }}
           >
             MeiT Tools
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip label={user.fullName || user.username} size="small" color={user.role === 'admin' ? 'primary' : 'default'} />
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end',
+              gap: 1,
+              flex: { xs: '1 1 100%', sm: '0 0 auto' },
+            }}
+          >
+            <Chip
+              label={user.fullName || user.username}
+              size="small"
+              color={user.role === 'admin' ? 'primary' : 'default'}
+              sx={{ maxWidth: { xs: 140, sm: 220 }, '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+            />
             <Button size="small" variant="outlined" color="inherit" onClick={() => setPasswordDialogOpen(true)}>
               Đổi mật khẩu
             </Button>
@@ -202,6 +224,8 @@ function AppInner() {
         )}
 
         {activeToolId === 'integrations' && <IntegrationsPanel />}
+
+        {activeToolId === 'team-metrics' && <TeamMetricsPanel />}
 
         {activeToolId === ADMIN_TOOL_ID && (
           <AdminPanel settings={adminSettings} onSettingsChanged={handleSettingsChanged} />

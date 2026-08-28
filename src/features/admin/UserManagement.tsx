@@ -449,7 +449,8 @@ export function UserManagement({ token, currentUsername }: Props) {
           <CircularProgress />
         </Box>
       ) : (
-        <Table size="small">
+        <Box sx={{ overflowX: 'auto' }}>
+        <Table size="small" sx={{ minWidth: 1080 }}>
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
@@ -534,6 +535,7 @@ export function UserManagement({ token, currentUsername }: Props) {
             ))}
           </TableBody>
         </Table>
+        </Box>
       )}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>

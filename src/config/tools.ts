@@ -24,6 +24,11 @@ export const TOOLS: ToolDef[] = [
     description: 'Facebook, Google Drive, Pancake Webhook, Zalo Bot.',
   },
   {
+    id: 'team-metrics',
+    label: 'Số liệu team',
+    description: 'Tính đi trễ/về sớm (Team Office) và giờ live/trễ giờ (Team Live).',
+  },
+  {
     id: 'admin',
     label: 'Admin',
     description: 'Cài đặt hệ thống: quản lý tab, bot và người dùng.',

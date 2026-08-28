@@ -33,8 +33,9 @@ export function LoginScreen() {
       onSubmit={handleSubmit}
       sx={{
         maxWidth: 360,
+        width: '100%',
         mx: 'auto',
-        mt: 10,
+        mt: { xs: 4, sm: 10 },
         display: 'flex',
         flexDirection: 'column',
         gap: 2,

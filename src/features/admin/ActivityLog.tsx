@@ -96,6 +96,7 @@ export function ActivityLog({ token }: { token: AuthUser['token'] }) {
           <CircularProgress />
         </Box>
       ) : (
+        <Box sx={{ overflowX: 'auto' }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -131,6 +132,7 @@ export function ActivityLog({ token }: { token: AuthUser['token'] }) {
             ))}
           </TableBody>
         </Table>
+        </Box>
       )}
     </Box>
   );
