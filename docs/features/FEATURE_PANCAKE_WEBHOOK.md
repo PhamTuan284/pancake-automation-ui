@@ -28,7 +28,6 @@ Hiển thị **URL nhận webhook**, hỗ trợ **đăng ký webhook** lên Panc
 | Đăng ký webhook | POST | `/pancake-webhook/register` — body `{ shopKey, webhook_url, webhook_enable, webhook_types, webhook_email? }` |
 | Sản phẩm / biến thể | GET | `/pancake-webhook/products/variations?shop=meit\|dpa` |
 | Phân tích biến thể | GET | `/pancake-webhook/analytics/variant-sales?days=7&eventLimit=1000&shop=meit\|dpa` |
-| Báo cáo Zalo (n8n) | GET | `/pancake-webhook/analytics/variant-sales/zalo-text?days=7&limit=15&shop=meit` → `{ text }` — xem `pancake-automation-server/docs/N8N_ZALO_VARIANT_REPORT.md` |
 | Ping | POST | `/pancake-webhook/ping` — body `{ payload: object }` |
 
 ## Kiểu dữ liệu (`src/types.ts`)

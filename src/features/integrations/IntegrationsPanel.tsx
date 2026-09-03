@@ -41,7 +41,7 @@ export function IntegrationsPanel() {
         <PancakeWebhookPanel toolDescription="Nhận dữ liệu orders / khách / kho từ Pancake qua Webhook Open API." />
       )}
       {activeSubTab === 'zalo-bot' && (
-        <ZaloBotPanel toolDescription="Gửi báo cáo biến thể bán chạy từ Pancake Webhook vào nhóm Zalo tự động mỗi ngày." />
+        <ZaloBotPanel toolDescription="Gửi báo cáo doanh thu, tồn kho và cảnh báo đơn hàng bất thường vào nhóm Zalo tự động mỗi ngày." />
       )}
     </Box>
   );

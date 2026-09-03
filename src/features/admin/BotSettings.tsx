@@ -65,7 +65,7 @@ export function BotSettings({ token, botEnabled, onSaved }: Props) {
             onChange={(e) => setEnabled((prev) => ({ ...prev, zalo: e.target.checked }))}
           />
         }
-        label="Zalo Bot – Báo cáo biến thể bán chạy"
+        label="Zalo Bot – Báo cáo tự động (doanh thu, tồn kho)"
       />
 
       <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>

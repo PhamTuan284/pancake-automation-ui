@@ -11,11 +11,8 @@ type ZaloUpdateChat = {
 type ZaloConfig = {
   botConfigured: boolean;
   chatId: string | null;
-  reportHour: number;
   shopKey: string;
   windowDays: number;
-  topLimit: number;
-  excludeVariants: string[];
 };
 
 type ZaloLog = {
@@ -93,7 +90,6 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [updatesError, setUpdatesError] = useState('');
 
   const [testBusy, setTestBusy] = useState(false);
-  const [reportBusy, setReportBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -220,24 +216,6 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     }
   }
 
-  async function handleSendReport() {
-    setReportBusy(true);
-    setActionMessage('');
-    setActionError('');
-    try {
-      const res = await fetch(apiUrl('/zalo-bot/send-report'), { method: 'POST' });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok) throw new Error(data.error ?? 'Gửi báo cáo thất bại');
-      setActionMessage('Đã gửi báo cáo biến thể bán chạy lên Zalo!');
-      setTimeout(() => setActionMessage(''), 5000);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Gửi báo cáo thất bại.');
-    } finally {
-      setReportBusy(false);
-      void loadLogs();
-    }
-  }
-
   async function handleSaveAbnormalConfig() {
     setSaveBusy(true);
     setSaveMessage('');
@@ -353,11 +331,8 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
           <tbody>
             <tr><td><code>ZALO_BOT_TOKEN</code></td><td>Token từ <a href="https://bot.zapps.me" target="_blank" rel="noreferrer">Zalo Bot Platform</a> (bắt buộc)</td></tr>
             <tr><td><code>ZALO_CHAT_ID</code></td><td>Chat ID của nhóm nhận báo cáo (bắt buộc)</td></tr>
-            <tr><td><code>ZALO_REPORT_HOUR</code></td><td>Giờ gửi tự động theo giờ VN, mặc định <code>8</code></td></tr>
             <tr><td><code>ZALO_REPORT_SHOP</code></td><td>Shop Pancake: <code>meit</code> hoặc <code>dpa</code>, mặc định <code>meit</code></td></tr>
-            <tr><td><code>ZALO_REPORT_DAYS</code></td><td>Số ngày phân tích, mặc định <code>7</code></td></tr>
-            <tr><td><code>ZALO_REPORT_LIMIT</code></td><td>Số dòng biến thể tối đa, mặc định <code>15</code></td></tr>
-            <tr><td><code>ZALO_EXCLUDE_VARIANTS</code></td><td>Mã biến thể loại trừ, phân cách bằng dấu phẩy (vd: <code>H,MTL01</code>)</td></tr>
+            <tr><td><code>ZALO_REPORT_DAYS</code></td><td>Số ngày phân tích tồn kho chậm bán, mặc định <code>7</code></td></tr>
           </tbody>
         </table>
         </div>
@@ -380,11 +355,7 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
                   ? <strong style={{ color: 'var(--color-ok, green)' }}>{config.chatId}</strong>
                   : <strong style={{ color: 'var(--color-error, red)' }}>✗ Chưa có (ZALO_CHAT_ID)</strong>}
               </li>
-              <li>Gửi tự động lúc <strong>{config.reportHour}:00</strong> (giờ VN) mỗi ngày</li>
-              <li>Shop: <code>{config.shopKey}</code> · {config.windowDays} ngày · top {config.topLimit} biến thể</li>
-              {config.excludeVariants.length > 0 && (
-                <li>Loại trừ: <code>{config.excludeVariants.join(', ')}</code></li>
-              )}
+              <li>Shop: <code>{config.shopKey}</code> · phân tích tồn kho chậm bán trong {config.windowDays} ngày</li>
             </ul>
           </div>
         )}
@@ -469,15 +440,11 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       <section className="card" aria-labelledby="zalo-actions-title">
         <h2 id="zalo-actions-title" className="section-title">Hành động</h2>
         <p className="muted small">
-          Bot tự động gửi báo cáo biến thể bán chạy vào nhóm Zalo mỗi ngày.
-          Dùng các nút dưới để kiểm tra kết nối hoặc gửi thủ công.
+          Dùng nút dưới để kiểm tra kết nối Zalo Bot.
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
           <UiButton onClick={() => void handleSendTest()} disabled={testBusy || !canSend}>
             {testBusy ? 'Đang gửi…' : 'Kiểm tra kết nối'}
-          </UiButton>
-          <UiButton onClick={() => void handleSendReport()} disabled={reportBusy || !canSend}>
-            {reportBusy ? 'Đang gửi…' : 'Gửi báo cáo ngay'}
           </UiButton>
         </div>
         {!canSend && !configLoading && (
