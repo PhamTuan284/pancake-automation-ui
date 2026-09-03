@@ -93,6 +93,10 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
+  const [salesSummaryBusy, setSalesSummaryBusy] = useState(false);
+  const [salesSummaryMessage, setSalesSummaryMessage] = useState('');
+  const [salesSummaryError, setSalesSummaryError] = useState('');
+
   const [abnormalConfig, setAbnormalConfig] = useState<AbnormalOrderConfig | null>(null);
   const [editEnabled, setEditEnabled] = useState(true);
   const [editThreshold, setEditThreshold] = useState('60');
@@ -212,6 +216,24 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
       setActionError(err instanceof Error ? err.message : 'Gửi test thất bại.');
     } finally {
       setTestBusy(false);
+      void loadLogs();
+    }
+  }
+
+  async function handleSendSalesSummary() {
+    setSalesSummaryBusy(true);
+    setSalesSummaryMessage('');
+    setSalesSummaryError('');
+    try {
+      const res = await fetch(apiUrl('/zalo-bot/send-sales-summary'), { method: 'POST' });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; text?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Gửi thất bại');
+      setSalesSummaryMessage(data.text ?? 'Đã gửi tổng hợp bán hàng 5 ngày lên Zalo!');
+      setTimeout(() => setSalesSummaryMessage(''), 6000);
+    } catch (err) {
+      setSalesSummaryError(err instanceof Error ? err.message : 'Gửi thất bại.');
+    } finally {
+      setSalesSummaryBusy(false);
       void loadLogs();
     }
   }
@@ -446,6 +468,13 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
           <UiButton onClick={() => void handleSendTest()} disabled={testBusy || !canSend}>
             {testBusy ? 'Đang gửi…' : 'Kiểm tra kết nối'}
           </UiButton>
+          <UiButton
+            variant="secondary"
+            onClick={() => void handleSendSalesSummary()}
+            disabled={salesSummaryBusy || !canSend}
+          >
+            {salesSummaryBusy ? 'Đang gửi…' : '🛍 Gửi tổng hợp bán hàng 5 ngày'}
+          </UiButton>
         </div>
         {!canSend && !configLoading && (
           <p className="hint" style={{ marginTop: '0.5rem' }}>
@@ -454,6 +483,8 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
         )}
         {actionMessage && <p className="hint hint-ok" style={{ marginTop: '0.75rem' }}>{actionMessage}</p>}
         {actionError && <p className="hint hint-error" style={{ marginTop: '0.75rem' }}>{actionError}</p>}
+        {salesSummaryMessage && <p className="hint hint-ok" style={{ marginTop: '0.75rem' }}>{salesSummaryMessage}</p>}
+        {salesSummaryError && <p className="hint hint-error" style={{ marginTop: '0.75rem' }}>{salesSummaryError}</p>}
       </section>
 
       <section className="card" aria-labelledby="zalo-abnormal-title">
