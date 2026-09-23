@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiUrl } from '../../lib/api';
+import { extractApiRows } from '../../lib/apiResponse';
 import { UiButton } from '../../components/ui';
 
 type ZaloUpdateChat = {
@@ -44,6 +45,10 @@ type ProductPriceRow = {
   offPlatformPrice: string;
   platformPrice: string;
   wholesalePrice: string;
+  /** Filled in from the Pancake catalog fetch — display only. */
+  productName?: string;
+  imageUrl?: string | null;
+  pancakePrice?: string;
 };
 
 const EMPTY_PRICE_ROW: ProductPriceRow = {
@@ -62,6 +67,94 @@ function toPriceRow(cfg: ProductPriceConfig): ProductPriceRow {
     platformPrice: String(cfg.platformPrice || ''),
     wholesalePrice: String(cfg.wholesalePrice || ''),
   };
+}
+
+type CatalogProduct = {
+  productCode: string;
+  productName: string;
+  imageUrl: string | null;
+  pancakePrice: string;
+};
+
+function catalogNestedProduct(row: Record<string, unknown>): Record<string, unknown> | null {
+  const p = row.product;
+  return p && typeof p === 'object' && !Array.isArray(p) ? (p as Record<string, unknown>) : null;
+}
+
+function catalogProductCode(row: Record<string, unknown>): string {
+  const prod = catalogNestedProduct(row);
+  return String(row.product_display_id ?? prod?.display_id ?? row.product_sku ?? '').trim();
+}
+
+function catalogProductName(row: Record<string, unknown>): string {
+  const prod = catalogNestedProduct(row);
+  return String(row.product_name ?? prod?.name ?? row.name ?? '').trim();
+}
+
+function catalogImageUrl(row: Record<string, unknown>): string | null {
+  const fromArray = (images: unknown): string | null => {
+    if (!Array.isArray(images) || images.length === 0) return null;
+    const first = images[0];
+    if (typeof first === 'string' && first.trim()) return first.trim();
+    if (first && typeof first === 'object') {
+      const img = first as Record<string, unknown>;
+      const url = img.thumbnail_url ?? img.url ?? img.src;
+      if (typeof url === 'string' && url.trim()) return url.trim();
+    }
+    return null;
+  };
+  const direct = fromArray(row.images);
+  if (direct) return direct;
+  const prod = catalogNestedProduct(row);
+  if (prod) {
+    const fromProd = fromArray(prod.images);
+    if (fromProd) return fromProd;
+    for (const field of ['thumbnail_url', 'image_url', 'photo_url', 'image']) {
+      const v = prod[field];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+  }
+  return null;
+}
+
+function catalogPancakePrice(row: Record<string, unknown>): string {
+  const prod = catalogNestedProduct(row);
+  const n = Number(row.price ?? prod?.price ?? 0);
+  return Number.isFinite(n) && n > 0 ? n.toLocaleString('vi-VN') + ' ₫' : '—';
+}
+
+/** Groups the raw variation rows returned by Pancake into one entry per product code. */
+function groupCatalogProducts(raw: unknown): CatalogProduct[] {
+  const rows = extractApiRows(raw);
+  const byCode = new Map<string, CatalogProduct>();
+  for (const row of rows) {
+    const productCode = catalogProductCode(row);
+    if (!productCode || byCode.has(productCode)) continue;
+    byCode.set(productCode, {
+      productCode,
+      productName: catalogProductName(row) || productCode,
+      imageUrl: catalogImageUrl(row),
+      pancakePrice: catalogPancakePrice(row),
+    });
+  }
+  return [...byCode.values()].sort((a, b) => a.productName.localeCompare(b.productName, 'vi'));
+}
+
+/** Merges freshly-fetched Pancake catalog rows into the price table, keeping any prices already saved. */
+function mergeCatalogIntoRows(existing: ProductPriceRow[], catalog: CatalogProduct[]): ProductPriceRow[] {
+  const byCode = new Map(existing.map((r) => [r.productCode, r]));
+  for (const p of catalog) {
+    const row = byCode.get(p.productCode);
+    byCode.set(p.productCode, {
+      ...(row ?? { ...EMPTY_PRICE_ROW, productCode: p.productCode }),
+      productName: p.productName,
+      imageUrl: p.imageUrl,
+      pancakePrice: p.pancakePrice,
+    });
+  }
+  return [...byCode.values()].sort((a, b) =>
+    (a.productName || a.productCode).localeCompare(b.productName || b.productCode, 'vi')
+  );
 }
 
 const KIND_LABEL: Record<ZaloLog['kind'], string> = {
@@ -111,6 +204,10 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
   const [newPriceRow, setNewPriceRow] = useState<ProductPriceRow>(EMPTY_PRICE_ROW);
   const [priceRowBusy, setPriceRowBusy] = useState<string | null>(null);
   const [priceError, setPriceError] = useState('');
+  const [priceShopKey, setPriceShopKey] = useState<'meit' | 'dpa'>('meit');
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [priceSearch, setPriceSearch] = useState('');
 
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
@@ -164,6 +261,30 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
     void loadAbnormalConfig();
     void loadPriceConfigs();
   }, [loadConfig, loadLogs, loadAbnormalConfig, loadPriceConfigs]);
+
+  const loadCatalogProducts = useCallback(async () => {
+    setCatalogLoading(true);
+    setCatalogError('');
+    try {
+      const res = await fetch(apiUrl(`/pancake-webhook/products/variations?shop=${priceShopKey}`));
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: unknown; error?: string };
+      if (!res.ok) throw new Error(json.error || 'Không tải được danh sách sản phẩm từ Pancake');
+      const catalog = groupCatalogProducts(json.data);
+      setPriceRows((rows) => mergeCatalogIntoRows(rows, catalog));
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : 'Không tải được danh sách sản phẩm.');
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [priceShopKey]);
+
+  const priceRowsFiltered = useMemo(() => {
+    const q = priceSearch.trim().toLowerCase();
+    if (!q) return priceRows;
+    return priceRows.filter((row) =>
+      `${row.productName ?? ''} ${row.productCode}`.toLowerCase().includes(q)
+    );
+  }, [priceRows, priceSearch]);
 
   async function handleSetWebhook() {
     setWebhookBusy(true);
@@ -565,11 +686,33 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
           <strong>bán dưới giá bán ngoài sàn</strong>, và đơn sỉ <strong>bán dưới giá bán sỉ</strong>.
         </p>
 
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.75rem' }}>
+          <label className="muted small">
+            Shop{' '}
+            <select value={priceShopKey} onChange={(e) => setPriceShopKey(e.target.value as 'meit' | 'dpa')}>
+              <option value="meit">MeiT</option>
+              <option value="dpa">DPA</option>
+            </select>
+          </label>
+          <UiButton onClick={() => void loadCatalogProducts()} disabled={catalogLoading} style={{ width: 'auto' }}>
+            {catalogLoading ? 'Đang tải…' : 'Tải danh sách sản phẩm từ Pancake'}
+          </UiButton>
+          <input
+            type="search"
+            className="search-input"
+            placeholder="Lọc theo tên hoặc mã sản phẩm…"
+            value={priceSearch}
+            onChange={(e) => setPriceSearch(e.target.value)}
+            style={{ minWidth: '220px' }}
+          />
+        </div>
+        {catalogError && <p className="hint hint-error" style={{ marginTop: '0.5rem' }}>{catalogError}</p>}
+
         <div style={{ overflowX: 'auto', marginTop: '0.75rem' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '720px' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '820px' }}>
             <thead>
               <tr>
-                {['Mã sản phẩm', 'Giá nhập', 'Giá ngoài sàn', 'Giá trên sàn', 'Giá sỉ', ''].map((h) => (
+                {['Sản phẩm', 'Giá nhập', 'Giá ngoài sàn', 'Giá trên sàn', 'Giá sỉ', ''].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -585,9 +728,26 @@ export function ZaloBotPanel({ toolDescription }: { toolDescription: string }) {
               </tr>
             </thead>
             <tbody>
-              {priceRows.map((row) => (
+              {priceRowsFiltered.map((row) => (
                 <tr key={row.productCode}>
-                  <td style={{ padding: '4px 8px' }}>{row.productCode}</td>
+                  <td style={{ padding: '4px 8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {row.imageUrl && (
+                        <img
+                          src={row.imageUrl}
+                          alt=""
+                          style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '13px' }}>{row.productName ?? row.productCode}</div>
+                        <div className="muted small" style={{ fontSize: '11px' }}>
+                          <code>{row.productCode}</code>
+                          {row.pancakePrice && row.pancakePrice !== '—' && <> · {row.pancakePrice}</>}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
                   {(['costPrice', 'offPlatformPrice', 'platformPrice', 'wholesalePrice'] as const).map((field) => (
                     <td key={field} style={{ padding: '4px 8px' }}>
                       <input
