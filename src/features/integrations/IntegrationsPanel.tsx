@@ -6,12 +6,14 @@ import { PancakeWebhookPanel } from '../pancake-webhook/PancakeWebhookPanel';
 import { ZaloBotPanel } from '../zalo-bot/ZaloBotPanel';
 import { FacebookPanel } from './FacebookPanel';
 import { DrivePanel } from './DrivePanel';
+import { EasyInvoicePanel } from './EasyInvoicePanel';
 
 const SUB_TABS = [
   { id: 'facebook', label: 'Facebook' },
   { id: 'drive', label: 'Google Drive' },
   { id: 'pancake-webhook', label: 'Pancake Webhook' },
   { id: 'zalo-bot', label: 'Zalo Bot' },
+  { id: 'easyinvoice', label: 'EasyInvoice API' },
 ] as const;
 
 type SubTabId = (typeof SUB_TABS)[number]['id'];
@@ -43,6 +45,7 @@ export function IntegrationsPanel() {
       {activeSubTab === 'zalo-bot' && (
         <ZaloBotPanel toolDescription="Gửi báo cáo doanh thu, tồn kho và cảnh báo đơn hàng bất thường vào nhóm Zalo tự động mỗi ngày." />
       )}
+      {activeSubTab === 'easyinvoice' && <EasyInvoicePanel />}
     </Box>
   );
 }
