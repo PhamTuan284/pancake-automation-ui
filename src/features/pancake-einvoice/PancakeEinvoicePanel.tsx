@@ -66,6 +66,8 @@ export function PancakeEinvoicePanel({
   const [crudMessage, setCrudMessage] = useState('');
   const [e2eStatus, setE2eStatus] = useState('sẵn sàng');
   const [e2eMessage, setE2eMessage] = useState('');
+  const [easyposStatus, setEasyposStatus] = useState('sẵn sàng');
+  const [easyposOutput, setEasyposOutput] = useState('');
   const [saveMode, setSaveMode] = useState<'draft' | 'publish'>('draft');
   const [meitDailyConfigured, setMeitDailyConfigured] = useState(
     shopKey !== 'meit'
@@ -356,6 +358,39 @@ export function PancakeEinvoicePanel({
     }
   };
 
+  const runEasyposCustomerNameFix = async () => {
+    setEasyposStatus('đang chạy');
+    setEasyposOutput('');
+    try {
+      const res = await fetch(apiUrl('/easypos-automation/fix-customer-names'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply: true }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        output?: string;
+      };
+      if (res.status === 409) {
+        setEasyposStatus('đang bận');
+        setEasyposOutput(data.error || 'Đang có tiến trình EasyPOS khác chạy.');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.error || 'EasyPOS automation failed');
+      }
+      setEasyposStatus('sẵn sàng');
+      setEasyposOutput(data.output || 'Đã chạy xong, không có log trả về.');
+    } catch (err) {
+      setEasyposStatus('lỗi');
+      setEasyposOutput(
+        err instanceof Error
+          ? err.message
+          : 'Không gọi được API. Chạy npm start trong pancake-automation-server.'
+      );
+    }
+  };
+
   const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -506,6 +541,34 @@ export function PancakeEinvoicePanel({
         </p>
         {e2eMessage && <p className="hint">{e2eMessage}</p>}
       </section>
+
+      {shopKey === 'meit' && (
+        <section className="card" aria-labelledby="easypos-run-title">
+          <h2 id="easypos-run-title" className="section-title">
+            EasyPOS: Sửa tên khách hàng (hóa đơn chưa phát hành)
+          </h2>
+          <p className="muted small">
+            Tự động điền tên gian hàng vào tên khách hàng mặc định (&quot;Bán cho người tiêu dùng&quot;)
+            trên các hóa đơn EasyPOS chưa phát hành — không phát hành hóa đơn, chỉ sửa tên hiển thị.
+          </p>
+          <div className="run-automation-actions">
+            <UiButton
+              onClick={() => void runEasyposCustomerNameFix()}
+              disabled={easyposStatus === 'đang chạy'}
+            >
+              {easyposStatus === 'đang chạy' ? 'Đang chạy…' : 'Chạy EasyPOS'}
+            </UiButton>
+          </div>
+          <p className="status status-e2e">
+            Trạng thái: <strong>{easyposStatus}</strong>
+          </p>
+          {easyposOutput && (
+            <pre className="hint" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {easyposOutput}
+            </pre>
+          )}
+        </section>
+      )}
 
       <section className="card" aria-labelledby="pancake-excel-title">
         <h2 id="pancake-excel-title" className="section-title">

@@ -12,7 +12,7 @@ export const INVOICE_SHOPS: InvoiceShopUiConfig[] = [
   {
     toolId: 'pancake-einvoice-meit',
     shopKey: 'meit',
-    label: 'Pancake · Hóa đơn MeiT',
+    label: 'Pancake - Easypos MeiT',
     defaultPancakeShopId: '1021314908',
   },
   {
