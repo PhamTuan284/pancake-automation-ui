@@ -527,17 +527,21 @@ export function PancakeEinvoicePanel({
         )}
         <p className="status status-e2e">
           Trạng thái: <strong>{e2eStatus}</strong>
-          {e2eStatus === 'đang chạy' && (
-            <UiButton
-              variant="secondary"
-              tone="danger"
-              onClick={() => void resetAutomationFlag()}
-              title="Dùng khi tiến trình bị kẹt và không tự dừng được"
-              style={{ marginLeft: '12px', fontSize: '12px', padding: '2px 8px' }}
-            >
-              Force reset
-            </UiButton>
-          )}
+          {
+            // Always shown, not just when e2eStatus === 'đang chạy': that's local state reset
+            // to 'sẵn sàng' on every page load, so it never reflects the server actually being
+            // stuck (e.g. a webhook auto-run or another tab/user left the lock held) — only
+            // calling /health or clicking this tells you the real state.
+          }
+          <UiButton
+            variant="secondary"
+            tone="danger"
+            onClick={() => void resetAutomationFlag()}
+            title="Dùng khi tiến trình bị kẹt và không tự dừng được (kể cả khi trạng thái ở đây vẫn hiện 'sẵn sàng')"
+            style={{ marginLeft: '12px', fontSize: '12px', padding: '2px 8px' }}
+          >
+            Force reset
+          </UiButton>
         </p>
         {e2eMessage && <p className="hint">{e2eMessage}</p>}
       </section>
@@ -561,6 +565,15 @@ export function PancakeEinvoicePanel({
           </div>
           <p className="status status-e2e">
             Trạng thái: <strong>{easyposStatus}</strong>
+            <UiButton
+              variant="secondary"
+              tone="danger"
+              onClick={() => void resetAutomationFlag()}
+              title="Dùng khi báo 'đang bận' nhưng thực ra không có gì đang chạy (lock dùng chung với Pancake)"
+              style={{ marginLeft: '12px', fontSize: '12px', padding: '2px 8px' }}
+            >
+              Force reset
+            </UiButton>
           </p>
           {easyposOutput && (
             <pre className="hint" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
