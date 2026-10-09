@@ -68,6 +68,7 @@ export function PancakeEinvoicePanel({
   const [e2eMessage, setE2eMessage] = useState('');
   const [easyposStatus, setEasyposStatus] = useState('sẵn sàng');
   const [easyposOutput, setEasyposOutput] = useState('');
+  const [easyposMessage, setEasyposMessage] = useState('');
   const [saveMode, setSaveMode] = useState<'draft' | 'publish'>('draft');
   const [meitDailyConfigured, setMeitDailyConfigured] = useState(
     shopKey !== 'meit'
@@ -297,13 +298,21 @@ export function PancakeEinvoicePanel({
 
   const resetAutomationFlag = async () => {
     try {
-      await fetch(apiUrl('/pancake-einvoice/reset-automation-flag'), {
+      const res = await fetch(apiUrl('/pancake-einvoice/reset-automation-flag'), {
         method: 'POST',
       });
+      const data = (await res.json().catch(() => ({}))) as { wasRunning?: boolean };
+      const message = data.wasRunning
+        ? 'Đã reset thành công — trước đó thực sự có tiến trình đang chạy (đã dừng và xoá cờ khoá).'
+        : 'Đã reset thành công — không có tiến trình nào đang chạy (cờ khoá đã được xoá để chắc chắn).';
       setE2eStatus('sẵn sàng');
-      setE2eMessage('Đã reset trạng thái. Kiểm tra server để đảm bảo không còn tiến trình nào đang chạy.');
+      setE2eMessage(message);
+      setEasyposStatus('sẵn sàng');
+      setEasyposMessage(message);
     } catch {
-      setE2eMessage('Không gọi được API reset.');
+      const failMessage = 'Không gọi được API reset.';
+      setE2eMessage(failMessage);
+      setEasyposMessage(failMessage);
     }
   };
 
@@ -361,6 +370,7 @@ export function PancakeEinvoicePanel({
   const runEasyposCustomerNameFix = async () => {
     setEasyposStatus('đang chạy');
     setEasyposOutput('');
+    setEasyposMessage('');
     try {
       const res = await fetch(apiUrl('/easypos-automation/fix-customer-names'), {
         method: 'POST',
@@ -575,6 +585,7 @@ export function PancakeEinvoicePanel({
               Force reset
             </UiButton>
           </p>
+          {easyposMessage && <p className="hint">{easyposMessage}</p>}
           {easyposOutput && (
             <pre className="hint" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {easyposOutput}
