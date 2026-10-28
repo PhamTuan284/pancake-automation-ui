@@ -19,19 +19,50 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../context/AuthContext';
-import { apiUrl } from '../../lib/api';
-import { authFetch } from '../../lib/authFetch';
+import { SESSION_EXPIRED_MESSAGE } from '../../lib/authFetch';
+
+// ─── storefront API helpers ─────────────────────────────────────────────────
+// storefront.routes.ts hardcodes an `/api/` prefix on every route (shared with the
+// customer-facing meit-storefront app), unlike the rest of this app's routes.
+// The shared apiUrl()/authFetch() helpers and this app's vite proxy assume no
+// `/api/` prefix, so storefront calls need their own origin + prefix here.
+const STOREFRONT_API_ORIGIN =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '') || 'http://localhost:4001';
+
+function storefrontApiUrl(path: string): string {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${STOREFRONT_API_ORIGIN}/api${p}`;
+}
+
+async function storefrontAuthFetch(
+  path: string,
+  token: string,
+  logout: (reason?: string) => void,
+  init: RequestInit = {}
+): Promise<Response | null> {
+  const res = await fetch(storefrontApiUrl(path), {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) {
+    logout(SESSION_EXPIRED_MESSAGE);
+    return null;
+  }
+  return res;
+}
 
 // ─── local types ────────────────────────────────────────────────────────────
 
 type HeroBannerConfig = { videoUrl: string; posterUrl: string };
 type ImageOverride = { id: string; imageUrl: string };
+type CostPriceOverride = { id: string; costPrice: number };
 
 type StorefrontConfig = {
   heroBanner: HeroBannerConfig;
   categoryBanners: ImageOverride[];
   productImageOverrides: ImageOverride[];
   variantImageOverrides: ImageOverride[];
+  productCostPrices: CostPriceOverride[];
 };
 
 type Variant = {
@@ -60,6 +91,7 @@ const DEFAULT_CONFIG: StorefrontConfig = {
   categoryBanners: [],
   productImageOverrides: [],
   variantImageOverrides: [],
+  productCostPrices: [],
 };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -246,7 +278,7 @@ function ProductImagesTab({
     setLoadingProducts(true);
     const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
     if (q) params.set('search', q);
-    fetch(apiUrl(`/store/products?${params}`))
+    fetch(storefrontApiUrl(`/store/products?${params}`))
       .then((r) => r.json())
       .then((data: { products: Product[]; total: number }) => {
         setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
@@ -400,6 +432,142 @@ function ProductImagesTab({
   );
 }
 
+// ─── Product Cost Price tab ───────────────────────────────────────────────────
+
+function ProductCostPriceTab({
+  costPrices,
+  onChange,
+}: {
+  costPrices: CostPriceOverride[];
+  onChange: (id: string, costPrice: number) => void;
+}) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchPage = useCallback((q: string, pg: number, append: boolean) => {
+    setLoadingProducts(true);
+    const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
+    if (q) params.set('search', q);
+    fetch(storefrontApiUrl(`/store/products?${params}`))
+      .then((r) => r.json())
+      .then((data: { products: Product[]; total: number }) => {
+        setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
+        setTotal(data.total);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  useEffect(() => {
+    fetchPage('', 1, false);
+  }, [fetchPage]);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      fetchPage(value, 1, false);
+    }, 400);
+  }
+
+  function loadMore() {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchPage(search, nextPage, true);
+  }
+
+  function getCostPrice(id: string) {
+    return costPrices.find((o) => o.id === id)?.costPrice ?? '';
+  }
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="body2" color="text.secondary">
+        Nhập giá nhập (giá vốn) cho từng sản phẩm. Dữ liệu này chỉ admin xem được, không hiển thị cho khách hàng trên storefront.
+      </Typography>
+
+      <TextField
+        placeholder="Tìm sản phẩm theo tên..."
+        value={search}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        fullWidth
+        size="small"
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
+
+      {loadingProducts && products.length === 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={32} />
+        </Box>
+      )}
+
+      {products.map((product) => {
+        const value = getCostPrice(product.id);
+        return (
+          <Card key={product.id} variant="outlined">
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {product.images[0] && (
+                <Box
+                  component="img"
+                  src={product.images[0]}
+                  alt=""
+                  sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{product.name}</Typography>
+                <Typography variant="caption" color="text.secondary">ID: {product.id}</Typography>
+              </Box>
+              <TextField
+                label="Giá nhập"
+                type="number"
+                value={value}
+                onChange={(e) => onChange(product.id, Number(e.target.value))}
+                size="small"
+                sx={{ width: 180 }}
+                slotProps={{
+                  input: {
+                    endAdornment: <InputAdornment position="end">đ</InputAdornment>,
+                  },
+                }}
+              />
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {products.length < total && (
+        <Button
+          variant="outlined"
+          onClick={loadMore}
+          disabled={loadingProducts}
+          startIcon={loadingProducts ? <CircularProgress size={16} /> : undefined}
+        >
+          Tải thêm ({products.length}/{total})
+        </Button>
+      )}
+
+      {!loadingProducts && products.length === 0 && (
+        <Alert severity="info">Không tìm thấy sản phẩm nào.</Alert>
+      )}
+    </Box>
+  );
+}
+
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function AdminStorefrontPanel({ toolDescription }: { toolDescription: string }) {
@@ -413,9 +581,13 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    if (!user?.token) {
+      setLoading(false);
+      return;
+    }
     Promise.all([
-      fetch(apiUrl('/admin/storefront-config')).then((r) => r.json()),
-      fetch(apiUrl('/store/categories')).then((r) => r.json()),
+      storefrontAuthFetch('/admin/storefront-config', user.token, logout).then((r) => r?.json() ?? DEFAULT_CONFIG),
+      fetch(storefrontApiUrl('/store/categories')).then((r) => r.json()),
     ])
       .then(([cfg, cats]: [StorefrontConfig, StoreCategory[]]) => {
         setConfig({ ...DEFAULT_CONFIG, ...cfg });
@@ -423,7 +595,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.token, logout]);
 
   async function handleSave() {
     if (!user?.token) return;
@@ -431,7 +603,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
     setError(null);
     setSuccess(false);
     try {
-      const res = await authFetch('/admin/storefront-config', user.token, logout, {
+      const res = await storefrontAuthFetch('/admin/storefront-config', user.token, logout, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -469,6 +641,16 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
         ? prev.variantImageOverrides.map((o) => (o.id === id ? { id, imageUrl } : o))
         : [...prev.variantImageOverrides, { id, imageUrl }];
       return { ...prev, variantImageOverrides: updated };
+    });
+  }
+
+  function handleCostPriceOverride(id: string, costPrice: number) {
+    setConfig((prev) => {
+      const exists = prev.productCostPrices.find((o) => o.id === id);
+      const updated = exists
+        ? prev.productCostPrices.map((o) => (o.id === id ? { id, costPrice } : o))
+        : [...prev.productCostPrices, { id, costPrice }];
+      return { ...prev, productCostPrices: updated };
     });
   }
 
@@ -528,6 +710,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
             <Tab label="Hero Banner" />
             <Tab label="Category Banners" />
             <Tab label="Product Images" />
+            <Tab label="Giá nhập" />
           </Tabs>
 
           {activeTab === 0 && (
@@ -549,6 +732,12 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
               variantOverrides={config.variantImageOverrides}
               onProductOverride={handleProductOverride}
               onVariantOverride={handleVariantOverride}
+            />
+          )}
+          {activeTab === 3 && (
+            <ProductCostPriceTab
+              costPrices={config.productCostPrices}
+              onChange={handleCostPriceOverride}
             />
           )}
         </>
