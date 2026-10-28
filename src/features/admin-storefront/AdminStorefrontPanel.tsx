@@ -19,6 +19,13 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Paper from '@mui/material/Paper';
 import { useAuth } from '../../context/AuthContext';
 import { SESSION_EXPIRED_MESSAGE } from '../../lib/authFetch';
 
@@ -541,41 +548,57 @@ function ProductCostPriceTab({
         </Box>
       )}
 
-      {products.map((product) => {
-        const value = getCostPrice(product.id);
-        return (
-          <Card key={product.id} variant="outlined">
-            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {product.images[0] && (
-                <Box
-                  component="img"
-                  src={product.images[0]}
-                  alt=""
-                  sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                />
-              )}
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{product.name}</Typography>
-                <Typography variant="caption" color="text.secondary">ID: {product.id}</Typography>
-              </Box>
-              <TextField
-                label="Giá nhập"
-                type="number"
-                value={value}
-                onChange={(e) => onChange(product.id, Number(e.target.value))}
-                size="small"
-                sx={{ width: 180 }}
-                slotProps={{
-                  input: {
-                    endAdornment: <InputAdornment position="end">đ</InputAdornment>,
-                  },
-                }}
-              />
-            </CardContent>
-          </Card>
-        );
-      })}
+      {products.length > 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 56 }} />
+                <TableCell>Sản phẩm</TableCell>
+                <TableCell align="right" sx={{ width: 200 }}>Giá nhập</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {products.map((product) => {
+                const value = getCostPrice(product.id);
+                return (
+                  <TableRow key={product.id} hover>
+                    <TableCell>
+                      {product.images[0] && (
+                        <Box
+                          component="img"
+                          src={product.images[0]}
+                          alt=""
+                          sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 0.5, display: 'block' }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{product.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">ID: {product.id}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        type="number"
+                        value={value}
+                        onChange={(e) => onChange(product.id, Number(e.target.value))}
+                        size="small"
+                        sx={{ width: 170 }}
+                        slotProps={{
+                          input: {
+                            endAdornment: <InputAdornment position="end">đ</InputAdornment>,
+                          },
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       {products.length < total && (
         <Button
