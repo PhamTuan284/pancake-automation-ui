@@ -16,6 +16,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../context/AuthContext';
@@ -209,6 +210,110 @@ function CategoryBannersTab({
   );
 }
 
+// ─── shared product catalog (fetched once, reused by Product Images + Giá nhập tabs) ──
+
+function useProductCatalog(token: string | undefined, logout: (reason?: string) => void) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchPage = useCallback((q: string, pg: number, append: boolean) => {
+    setLoadingProducts(true);
+    const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
+    if (q) params.set('search', q);
+    return fetch(storefrontApiUrl(`/store/products?${params}`))
+      .then((r) => r.json())
+      .then((data: { products: Product[]; total: number }) => {
+        setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
+        setTotal(data.total);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  // Runs once — this hook lives in the parent, so it survives tab switches
+  // instead of refetching every time Product Images / Giá nhập is reselected.
+  useEffect(() => {
+    void fetchPage('', 1, false);
+  }, [fetchPage]);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      void fetchPage(value, 1, false);
+    }, 400);
+  }
+
+  function loadMore() {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    void fetchPage(search, nextPage, true);
+  }
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      if (token) {
+        await storefrontAuthFetch('/store/cache/invalidate', token, logout, { method: 'POST' });
+      }
+      setPage(1);
+      await fetchPage(search, 1, false);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  return { products, total, search, loadingProducts, refreshing, handleSearchChange, loadMore, refresh };
+}
+
+function ProductSearchBar({
+  search,
+  onSearchChange,
+  onRefresh,
+  refreshing,
+}: {
+  search: string;
+  onSearchChange: (value: string) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  return (
+    <Box sx={{ display: 'flex', gap: 1 }}>
+      <TextField
+        placeholder="Tìm sản phẩm theo tên..."
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+        fullWidth
+        size="small"
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
+      <Button
+        variant="outlined"
+        onClick={onRefresh}
+        disabled={refreshing}
+        startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
+        sx={{ flexShrink: 0 }}
+      >
+        Làm mới
+      </Button>
+    </Box>
+  );
+}
+
 // ─── Product Images tab ───────────────────────────────────────────────────────
 
 function OverrideField({
@@ -257,56 +362,32 @@ function OverrideField({
 }
 
 function ProductImagesTab({
+  products,
+  total,
+  search,
+  loadingProducts,
+  refreshing,
+  onSearchChange,
+  onLoadMore,
+  onRefresh,
   productOverrides,
   variantOverrides,
   onProductOverride,
   onVariantOverride,
 }: {
+  products: Product[];
+  total: number;
+  search: string;
+  loadingProducts: boolean;
+  refreshing: boolean;
+  onSearchChange: (value: string) => void;
+  onLoadMore: () => void;
+  onRefresh: () => void;
   productOverrides: ImageOverride[];
   variantOverrides: ImageOverride[];
   onProductOverride: (id: string, imageUrl: string) => void;
   onVariantOverride: (id: string, imageUrl: string) => void;
 }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchPage = useCallback((q: string, pg: number, append: boolean) => {
-    setLoadingProducts(true);
-    const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
-    if (q) params.set('search', q);
-    fetch(storefrontApiUrl(`/store/products?${params}`))
-      .then((r) => r.json())
-      .then((data: { products: Product[]; total: number }) => {
-        setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
-        setTotal(data.total);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingProducts(false));
-  }, []);
-
-  useEffect(() => {
-    fetchPage('', 1, false);
-  }, [fetchPage]);
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setPage(1);
-      fetchPage(value, 1, false);
-    }, 400);
-  }
-
-  function loadMore() {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchPage(search, nextPage, true);
-  }
-
   function getProductOverride(id: string) {
     return productOverrides.find((o) => o.id === id)?.imageUrl ?? '';
   }
@@ -320,22 +401,7 @@ function ProductImagesTab({
         Đặt ảnh override cho từng sản phẩm và biến thể. Nếu để trống, hệ thống dùng ảnh từ Pancake.
       </Typography>
 
-      <TextField
-        placeholder="Tìm sản phẩm theo tên..."
-        value={search}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        fullWidth
-        size="small"
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
+      <ProductSearchBar search={search} onSearchChange={onSearchChange} onRefresh={onRefresh} refreshing={refreshing} />
 
       {loadingProducts && products.length === 0 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -417,7 +483,7 @@ function ProductImagesTab({
       {products.length < total && (
         <Button
           variant="outlined"
-          onClick={loadMore}
+          onClick={onLoadMore}
           disabled={loadingProducts}
           startIcon={loadingProducts ? <CircularProgress size={16} /> : undefined}
         >
@@ -435,52 +501,28 @@ function ProductImagesTab({
 // ─── Product Cost Price tab ───────────────────────────────────────────────────
 
 function ProductCostPriceTab({
+  products,
+  total,
+  search,
+  loadingProducts,
+  refreshing,
+  onSearchChange,
+  onLoadMore,
+  onRefresh,
   costPrices,
   onChange,
 }: {
+  products: Product[];
+  total: number;
+  search: string;
+  loadingProducts: boolean;
+  refreshing: boolean;
+  onSearchChange: (value: string) => void;
+  onLoadMore: () => void;
+  onRefresh: () => void;
   costPrices: CostPriceOverride[];
   onChange: (id: string, costPrice: number) => void;
 }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchPage = useCallback((q: string, pg: number, append: boolean) => {
-    setLoadingProducts(true);
-    const params = new URLSearchParams({ pageSize: '20', page: String(pg) });
-    if (q) params.set('search', q);
-    fetch(storefrontApiUrl(`/store/products?${params}`))
-      .then((r) => r.json())
-      .then((data: { products: Product[]; total: number }) => {
-        setProducts((prev) => (append ? [...prev, ...data.products] : data.products));
-        setTotal(data.total);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingProducts(false));
-  }, []);
-
-  useEffect(() => {
-    fetchPage('', 1, false);
-  }, [fetchPage]);
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setPage(1);
-      fetchPage(value, 1, false);
-    }, 400);
-  }
-
-  function loadMore() {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchPage(search, nextPage, true);
-  }
-
   function getCostPrice(id: string) {
     return costPrices.find((o) => o.id === id)?.costPrice ?? '';
   }
@@ -491,22 +533,7 @@ function ProductCostPriceTab({
         Nhập giá nhập (giá vốn) cho từng sản phẩm. Dữ liệu này chỉ admin xem được, không hiển thị cho khách hàng trên storefront.
       </Typography>
 
-      <TextField
-        placeholder="Tìm sản phẩm theo tên..."
-        value={search}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        fullWidth
-        size="small"
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
+      <ProductSearchBar search={search} onSearchChange={onSearchChange} onRefresh={onRefresh} refreshing={refreshing} />
 
       {loadingProducts && products.length === 0 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -553,7 +580,7 @@ function ProductCostPriceTab({
       {products.length < total && (
         <Button
           variant="outlined"
-          onClick={loadMore}
+          onClick={onLoadMore}
           disabled={loadingProducts}
           startIcon={loadingProducts ? <CircularProgress size={16} /> : undefined}
         >
@@ -579,6 +606,7 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const catalog = useProductCatalog(user?.token, logout);
 
   useEffect(() => {
     if (!user?.token) {
@@ -728,6 +756,14 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
           )}
           {activeTab === 2 && (
             <ProductImagesTab
+              products={catalog.products}
+              total={catalog.total}
+              search={catalog.search}
+              loadingProducts={catalog.loadingProducts}
+              refreshing={catalog.refreshing}
+              onSearchChange={catalog.handleSearchChange}
+              onLoadMore={catalog.loadMore}
+              onRefresh={catalog.refresh}
               productOverrides={config.productImageOverrides}
               variantOverrides={config.variantImageOverrides}
               onProductOverride={handleProductOverride}
@@ -736,6 +772,14 @@ export function AdminStorefrontPanel({ toolDescription }: { toolDescription: str
           )}
           {activeTab === 3 && (
             <ProductCostPriceTab
+              products={catalog.products}
+              total={catalog.total}
+              search={catalog.search}
+              loadingProducts={catalog.loadingProducts}
+              refreshing={catalog.refreshing}
+              onSearchChange={catalog.handleSearchChange}
+              onLoadMore={catalog.loadMore}
+              onRefresh={catalog.refresh}
               costPrices={config.productCostPrices}
               onChange={handleCostPriceOverride}
             />
