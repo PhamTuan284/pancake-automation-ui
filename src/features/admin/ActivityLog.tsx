@@ -33,6 +33,7 @@ const ACTION_LABEL: Record<string, string> = {
   leave_approve: 'Duyệt đơn nghỉ phép',
   leave_reject: 'Từ chối đơn nghỉ phép',
   leave_cancel: 'Hủy đơn nghỉ phép',
+  send_product_sales_range: 'Gửi SL đã bán theo mã',
 };
 
 const ACTION_COLOR: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
@@ -46,6 +47,7 @@ const ACTION_COLOR: Record<string, 'default' | 'primary' | 'success' | 'error' |
   leave_approve: 'success',
   leave_reject: 'error',
   leave_cancel: 'warning',
+  send_product_sales_range: 'default',
 };
 
 function formatDateTime(iso: string): string {

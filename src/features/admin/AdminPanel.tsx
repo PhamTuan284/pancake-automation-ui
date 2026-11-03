@@ -13,6 +13,7 @@ import { BotSettings } from './BotSettings';
 import { WorkHoursSettings } from './WorkHoursSettings';
 import { UserManagement } from './UserManagement';
 import { ActivityLog } from './ActivityLog';
+import { ProductSalesReport } from './ProductSalesReport';
 
 type AdminSettings = {
   tabAccess: Record<string, string[]>;
@@ -65,6 +66,7 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
         <Tab label="Giờ làm chuẩn" />
         {user.role === 'admin' && <Tab label="Người dùng" />}
         {user.role === 'admin' && <Tab label="Nhật ký hoạt động" />}
+        {user.role === 'admin' && <Tab label="SL đã bán" />}
       </Tabs>
 
       {activeTab === 0 && (
@@ -94,6 +96,9 @@ export function AdminPanel({ settings, onSettingsChanged }: Props) {
       )}
       {activeTab === 4 && user.role === 'admin' && (
         <ActivityLog token={user.token} />
+      )}
+      {activeTab === 5 && user.role === 'admin' && (
+        <ProductSalesReport token={user.token} />
       )}
     </Box>
   );
