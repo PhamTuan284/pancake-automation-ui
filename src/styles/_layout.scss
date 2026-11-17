@@ -1142,10 +1142,24 @@ a.excel-template-link,
   }
 
   .app-navbar {
+    // AppBar is width:100%; widen it to cancel the page gutter instead of shifting it left.
+    width: calc(100% + 32px) !important;
+    max-width: none;
     margin: 0 -16px 16px;
     border-radius: 0;
     border-left: 0;
     border-right: 0;
+  }
+
+  .app-navbar-toolbar {
+    padding: 10px 12px !important;
+    row-gap: 8px;
+  }
+
+  .app-navbar-title {
+    flex: 1 1 100% !important;
+    font-size: 20px !important;
+    white-space: nowrap;
   }
 
   .card {

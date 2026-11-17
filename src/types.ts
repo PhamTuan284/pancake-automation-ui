@@ -187,3 +187,66 @@ export type SalaryResult = {
   netIncome: number;
 };
 
+
+// ---- Task assignment (TMS · Giao việc) ----
+
+export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type TaskChecklistItem = { _id: string; text: string; done: boolean };
+
+export type TaskComment = {
+  _id: string;
+  username: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+};
+
+export type TaskActivity = { username: string; action: string; detail: string; at: string };
+
+export type TaskRecord = {
+  _id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignees: string[];
+  department: string;
+  labels: string[];
+  createdBy: string;
+  createdByName: string;
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+  order: number;
+  checklist: TaskChecklistItem[];
+  comments?: TaskComment[];
+  activity?: TaskActivity[];
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TaskUser = {
+  username: string;
+  fullName: string;
+  department: string;
+  role: 'admin' | 'user';
+};
+
+export type TaskStats = {
+  counts: Record<TaskStatus, number>;
+  overdue: number;
+  dueToday: number;
+  doneThisWeek: number;
+  total: number;
+};
+
+export type TaskWorkloadRow = TaskUser & {
+  open: number;
+  inProgress: number;
+  review: number;
+  overdue: number;
+  done: number;
+};

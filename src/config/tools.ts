@@ -1,8 +1,17 @@
 import type { ToolDef } from '../types';
 import { INVOICE_SHOPS } from './invoiceShops';
 
-/** Registered tools; add entries here as new UIs ship. */
+/**
+ * Registered tools; add entries here as new UIs ship. Order matters: the
+ * first tab the user can access is the one opened on first visit.
+ */
 export const TOOLS: ToolDef[] = [
+  {
+    id: 'tasks',
+    label: 'Kanban',
+    description:
+      'Giao việc cho nhân viên, theo dõi tiến độ trên bảng Kanban, checklist, bình luận và báo cáo khối lượng công việc.',
+  },
   ...INVOICE_SHOPS.map((shop) => ({
     id: shop.toolId,
     label: shop.label,

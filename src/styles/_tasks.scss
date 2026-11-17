@@ -1,0 +1,777 @@
+@use './tokens' as t;
+
+// ---- TMS · Giao việc ----
+
+$col-todo: #94a3b8;
+$col-in-progress: #3b82f6;
+$col-review: #f59e0b;
+$col-done: #22c55e;
+
+// Stat tiles ------------------------------------------------------------
+
+.task-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.task-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-md;
+  background: t.$bg-surface;
+  color: t.$text-primary;
+  text-align: left;
+  font: inherit;
+  cursor: default;
+
+  &.is-clickable {
+    cursor: pointer;
+    &:hover {
+      border-color: t.$primary;
+    }
+  }
+  &:disabled {
+    opacity: 1;
+    cursor: default;
+  }
+
+  &--danger .task-stat-value { color: #f87171; }
+  &--warn .task-stat-value { color: #fbbf24; }
+  &--ok .task-stat-value { color: #4ade80; }
+  &--info .task-stat-value { color: #93c5fd; }
+}
+
+.task-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.task-stat-label {
+  font-size: 12px;
+  color: t.$text-secondary;
+}
+
+// Toolbar & filters -----------------------------------------------------
+
+.task-panel {
+  padding: 16px;
+}
+
+.task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+// Kanban ----------------------------------------------------------------
+
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  align-items: start;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: repeat(4, 260px);
+  }
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  border-radius: t.$radius-md;
+  border: 1px solid t.$border-default;
+  background: t.$bg-surface-soft;
+  transition: border-color t.$trans-fast, background t.$trans-fast;
+
+  &.is-over {
+    border-color: t.$primary;
+    background: rgba(59, 130, 246, 0.06);
+  }
+
+  &--todo .kanban-column-dot { background: $col-todo; }
+  &--in_progress .kanban-column-dot { background: $col-in-progress; }
+  &--review .kanban-column-dot { background: $col-review; }
+  &--done .kanban-column-dot { background: $col-done; }
+}
+
+.kanban-column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 2px 12px;
+}
+
+.kanban-column-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kanban-column-title {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.kanban-column-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: t.$bg-hover;
+  color: t.$text-secondary;
+}
+
+.kanban-column-hint {
+  margin: 0 12px 8px;
+}
+
+.kanban-column-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 8px 10px;
+  min-height: 120px;
+}
+
+.kanban-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-placeholder {
+  height: 56px;
+  border: 2px dashed t.$primary;
+  border-radius: t.$radius-sm;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.kanban-empty {
+  margin: auto;
+  padding: 24px 0;
+  text-align: center;
+  border: 1px dashed t.$border-default;
+  border-radius: t.$radius-sm;
+}
+
+// Card ------------------------------------------------------------------
+
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid t.$border-default;
+  border-left-width: 4px;
+  border-radius: t.$radius-sm;
+  background: t.$bg-surface;
+  cursor: pointer;
+  transition: border-color t.$trans-fast, box-shadow t.$trans-fast, opacity t.$trans-fast, transform t.$trans-fast;
+
+  &:hover {
+    border-color: t.$border-strong;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+  &.is-draggable {
+    cursor: grab;
+  }
+  &.is-dragging {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+
+  &--low { border-left-color: #64748b; }
+  &--medium { border-left-color: #3b82f6; }
+  &--high { border-left-color: #f59e0b; }
+  &--urgent { border-left-color: #ef4444; }
+}
+
+.task-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #f1f5f9;
+  word-break: break-word;
+}
+
+.task-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.task-label {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
+
+.task-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.task-card-creator {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-card-assignees {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  .task-avatar + .task-avatar {
+    margin-left: -6px;
+  }
+}
+
+.task-unassigned {
+  font-size: 11px;
+  color: t.$text-muted;
+  font-style: italic;
+}
+
+// Pills: priority / due / status ----------------------------------------
+
+.task-priority,
+.task-due,
+.task-status,
+.task-checklist-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.task-priority {
+  &--low { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
+  &--medium { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+  &--high { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+  &--urgent { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+}
+
+.task-due {
+  background: rgba(148, 163, 184, 0.12);
+  color: t.$text-secondary;
+
+  &--overdue { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+  &--today { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+  &--soon { background: rgba(251, 191, 36, 0.12); color: #fde68a; }
+  &--done { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+}
+
+.task-status {
+  &--todo { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+  &--in_progress { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+  &--review { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+  &--done { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+}
+
+.task-checklist-badge {
+  background: rgba(148, 163, 184, 0.12);
+  color: t.$text-secondary;
+  &.is-complete {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+  }
+}
+
+// Avatar ----------------------------------------------------------------
+
+.task-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid t.$bg-surface;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+
+  &--more {
+    background: t.$bg-hover;
+    color: t.$text-secondary;
+    font-size: 10px;
+  }
+}
+
+.task-assignee-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-assignee-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 3px;
+  border-radius: 999px;
+  background: t.$bg-hover;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// Detail dialog ---------------------------------------------------------
+
+.task-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.task-detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-detail-meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: t.$text-muted;
+}
+
+.task-description {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.task-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: t.$radius-sm;
+    &:hover {
+      background: rgba(148, 163, 184, 0.06);
+    }
+    &.is-done .task-checklist-text {
+      text-decoration: line-through;
+      color: t.$text-muted;
+    }
+  }
+}
+
+.task-checklist-text {
+  flex: 1;
+  font-size: 14px;
+}
+
+.task-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.task-comment-body {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: t.$radius-sm;
+  background: t.$bg-surface-soft;
+  border: 1px solid t.$border-default;
+
+  p {
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 14px;
+  }
+}
+
+.task-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+
+  strong {
+    color: #f1f5f9;
+  }
+  .MuiIconButton-root {
+    margin-left: auto;
+  }
+}
+
+.task-activity {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+// List & workload tables ------------------------------------------------
+
+.task-table-row {
+  cursor: pointer;
+}
+
+.task-table-title {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.task-workload-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: t.$bg-hover;
+  overflow: hidden;
+}
+
+.task-workload-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: t.$primary;
+  transition: width t.$trans-fast;
+
+  &.has-overdue {
+    background: t.$error;
+  }
+}
+
+// Card move button (touch-friendly alternative to drag and drop) ---------
+
+.task-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.task-card-top-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-card-move {
+  flex-shrink: 0;
+  margin: -6px -8px 0 0 !important;
+  color: t.$text-muted !important;
+  opacity: 0.6;
+  transition: opacity t.$trans-fast;
+
+  .task-card:hover &,
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.task-view-label {
+  margin-left: 4px;
+}
+
+// Mobile column tabs (one Kanban column visible at a time) --------------
+
+.kanban-mobile-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.kanban-mobile-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-sm;
+  background: t.$bg-surface-soft;
+  color: t.$text-secondary;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+
+  &.is-active {
+    border-color: t.$primary;
+    background: rgba(59, 130, 246, 0.12);
+    color: #f1f5f9;
+  }
+
+  &.kanban-column--todo .kanban-column-dot { background: $col-todo; }
+  &.kanban-column--in_progress .kanban-column-dot { background: $col-in-progress; }
+  &.kanban-column--review .kanban-column-dot { background: $col-review; }
+  &.kanban-column--done .kanban-column-dot { background: $col-done; }
+}
+
+.kanban--mobile {
+  display: block;
+  overflow: visible;
+
+  .kanban-column {
+    min-height: 0;
+  }
+  .kanban-column-head {
+    padding-top: 6px;
+  }
+}
+
+// Mobile list & workload cards -----------------------------------------
+
+.task-mobile-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.task-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-workload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid t.$border-default;
+  border-radius: t.$radius-sm;
+  background: t.$bg-surface;
+  color: t.$text-primary;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-workload-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-workload-card-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+
+  strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.task-workload-card-open {
+  font-weight: 700;
+  color: #93c5fd;
+  white-space: nowrap;
+}
+
+.task-fab {
+  position: fixed !important;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1200;
+}
+
+// Phone layout ----------------------------------------------------------
+
+@media (max-width: 720px) {
+  .task-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .task-stat {
+    padding: 8px 10px;
+  }
+
+  .task-stat-value {
+    font-size: 20px;
+  }
+
+  .task-stat-label {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .task-panel {
+    padding: 12px;
+    // Room for the floating "Giao việc" button so it never covers the last card.
+    margin-bottom: 72px;
+  }
+
+  .task-toolbar {
+    gap: 8px;
+  }
+
+  .task-toolbar .MuiTabs-root {
+    flex: 1 1 100%;
+  }
+
+  .task-toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+
+    .MuiToggleButtonGroup-root {
+      flex: 1;
+    }
+    .MuiToggleButton-root {
+      flex: 1;
+      min-height: 40px;
+    }
+  }
+
+  .task-view-label {
+    font-size: 12px;
+  }
+
+  .task-filters {
+    gap: 8px;
+
+    > .MuiTextField-root {
+      flex: 1 1 calc(50% - 4px) !important;
+      min-width: 0 !important;
+    }
+    > .MuiTextField-root:first-child {
+      flex-basis: 100% !important;
+    }
+  }
+
+  // Always-visible move button on touch screens (there is no hover).
+  .task-card-move {
+    opacity: 1;
+  }
+
+  .task-card {
+    padding: 12px;
+  }
+
+  // Comfortable tap targets inside dialogs.
+  .task-checklist li {
+    min-height: 44px;
+  }
+
+  .task-detail-meta {
+    gap: 12px 16px;
+  }
+
+  .task-dialog-actions {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 8px;
+
+    .MuiButton-root {
+      flex: 1;
+      min-height: 44px;
+      margin-left: 0 !important;
+    }
+  }
+
+  // iOS Safari zooms into any focused input under 16px; keep task inputs at 16px.
+  .task-panel .MuiInputBase-input,
+  .task-dialog .MuiInputBase-input,
+  .task-panel .MuiSelect-select,
+  .task-dialog .MuiSelect-select {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .task-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kanban-mobile-tab {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 720px) {
+  .task-toolbar-actions .MuiToggleButton-root {
+    padding: 6px 4px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 400px) {
+  // Icons alone are enough on the narrowest phones; labels stay for screen readers via aria-label.
+  .task-view-label {
+    display: none;
+  }
+}

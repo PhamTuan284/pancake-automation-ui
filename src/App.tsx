@@ -11,6 +11,7 @@ import { TOOLS } from './config/tools';
 import { INVOICE_SHOPS } from './config/invoiceShops';
 import { PancakeEinvoicePanel } from './features/pancake-einvoice/PancakeEinvoicePanel';
 import { LeavePanel } from './features/leave/LeavePanel';
+import { TasksPanel } from './features/tasks/TasksPanel';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
 import { IntegrationsPanel } from './features/integrations/IntegrationsPanel';
@@ -183,7 +184,7 @@ function AppInner() {
         </Toolbar>
         <Box className="app-navbar-tabs-wrap">
           <Tabs
-            value={activeToolId}
+            value={visibleTools.some((t) => t.id === activeToolId) ? activeToolId : false}
             onChange={(_event, nextId: string) => setActiveToolId(nextId)}
             variant="scrollable"
             scrollButtons="auto"
@@ -217,6 +218,10 @@ function AppInner() {
 
         {activeToolId === 'leave' && (
           <LeavePanel toolDescription={activeTool?.description ?? ''} />
+        )}
+
+        {activeToolId === 'tasks' && (
+          <TasksPanel toolDescription={activeTool?.description ?? ''} />
         )}
 
         {activeToolId === 'admin-storefront' && (
