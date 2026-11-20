@@ -38,6 +38,12 @@ export const TOOLS: ToolDef[] = [
     description: 'Tính đi trễ/về sớm (Team Office) và giờ live/trễ giờ (Team Live).',
   },
   {
+    id: 'payroll',
+    label: 'Tính lương',
+    description:
+      'Bảng lương tháng theo team (Live, Media, Marketing, Sale, Kho, Kế toán, Mẫu): công thức theo từng nhân viên, bảo hiểm, thuế TNCN, nhập số liệu và xuất file Excel đúng mẫu bảng lương. Dành cho admin và kế toán (phòng Accountant).',
+  },
+  {
     id: 'admin',
     label: 'Admin',
     description: 'Cài đặt hệ thống: quản lý tab, bot và người dùng.',

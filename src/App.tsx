@@ -16,6 +16,7 @@ import { AdminPanel } from './features/admin/AdminPanel';
 import { AdminStorefrontPanel } from './features/admin-storefront/AdminStorefrontPanel';
 import { IntegrationsPanel } from './features/integrations/IntegrationsPanel';
 import { TeamMetricsPanel } from './features/team-metrics/TeamMetricsPanel';
+import { PayrollPanel } from './features/payroll/PayrollPanel';
 import { LoginScreen } from './components/LoginScreen';
 import { ChangePasswordDialog } from './components/ChangePasswordDialog';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -231,6 +232,8 @@ function AppInner() {
         {activeToolId === 'integrations' && <IntegrationsPanel />}
 
         {activeToolId === 'team-metrics' && <TeamMetricsPanel />}
+
+        {activeToolId === 'payroll' && <PayrollPanel toolDescription={activeTool?.description ?? ''} />}
 
         {activeToolId === ADMIN_TOOL_ID && (
           <AdminPanel settings={adminSettings} onSettingsChanged={handleSettingsChanged} />
